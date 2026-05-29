@@ -12,7 +12,7 @@ import json
 
 app = FastAPI()
 
-images_dir = Path(__file__).parent.parent.parent.parent.parent / "image"
+images_dir = Path(__file__).parent.parent.parent.parent.parent / "docs" / "images"
 app.mount("/image", StaticFiles(directory=str(images_dir)), name="image")
 
 # Message queues to bridge the sync Python code and the async WebSocket
