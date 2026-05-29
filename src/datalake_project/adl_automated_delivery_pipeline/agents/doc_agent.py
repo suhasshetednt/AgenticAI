@@ -42,7 +42,7 @@ for _candidate in [
 
 logger = logging.getLogger(__name__)
 
-_OUTPUT_DIR = Path("D:/Agents/Project Documentation")
+_OUTPUT_DIR = Path.cwd() / "Project Documentation"
 
 # ASL brand colours
 _COLOR_NAVY = RGBColor(0x00, 0x38, 0x6B)   # ASL navy blue
