@@ -1,0 +1,63 @@
+{
+  "ticket_id": "ADL-1700",
+  "summary": "[APU Health Monitor] Create query for APU Health Monitor in Engine Folder",
+  "generated_at": "20260529_104328",
+  "source_database": "amos_acceptance",
+  "source_tables": [
+    "amos.rotables",
+    "amos.rotables_trend",
+    "amos.aircraft"
+  ],
+  "output_fields": [
+    {
+      "name": "partno",
+      "description": "APU Part Number"
+    },
+    {
+      "name": "serialno",
+      "description": "APU Serial Number"
+    },
+    {
+      "name": "psn",
+      "description": "Unique PSN associated with each APU Serial Number"
+    },
+    {
+      "name": "ac_registr",
+      "description": "Aircraft Registration"
+    },
+    {
+      "name": "ref_date",
+      "description": "Reference Date - latest date only for each APU"
+    },
+    {
+      "name": "trend_type",
+      "description": "Trend Type - CT5"
+    },
+    {
+      "name": "event_perfno_i",
+      "description": "Workorder if present"
+    },
+    {
+      "name": "value",
+      "description": "CT5ATP value"
+    },
+    {
+      "name": "ac_typ",
+      "description": "Aircraft Type"
+    }
+  ],
+  "transformations": [
+    "Join rotables table with rotables_trend table on psn field",
+    "Join result with aircraft table on ac_registr field to filter by aircraft type",
+    "For each APU (identified by psn and serialno), select only the row with the maximum ref_date value",
+    "Filter rotables_trend records where trend_type equals CT5"
+  ],
+  "acceptance_criteria": [
+    "Query returns APU part numbers and serial numbers for all B737NG aircraft",
+    "Each APU is represented only once with its most recent CT5ATP trend value",
+    "All output fields are populated correctly from source tables",
+    "Query can be switched from AMOS Acceptance to AMOS Production when system goes live",
+    "VDS is created in Engine Folder as specified",
+    "Workorder information is included when present in rotables_trend"
+  ]
+}
