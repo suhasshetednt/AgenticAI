@@ -1062,11 +1062,23 @@ def _dremio_phase(reqs: TicketRequirements | None) -> str:
                                         print(f"  VDS created successfully!")
                                         print(f"  ID  : {cres.get('vds_id')}")
                                         print(f"  Path: {cres.get('vds_path')}\n")
+                                        return approved_vds_path
                                     else:
                                         print(f"\n  VDS creation FAILED:")
                                         print(f"  {cres.get('error', cres)}\n")
-                                print(f"  VDS path : {approved_vds_path}\n")
-                        return approved_vds_path
+                                
+                                autofix = _inp("  Would you like the Dremio Agent to auto-fix this error? [y/n]: ")
+                                if autofix.lower() in ("y", "yes"):
+                                    err_msg = val.get("error") if val.get("status") != "SUCCESS" else cres.get("error")
+                                    sep = "\n" if reqs.extra_notes else ""
+                                    reqs.extra_notes += f"{sep}[Attempt {attempt} API Error]: {err_msg}. Please fix this SQL error."
+                                    print("  Error noted. Regenerating ...\n")
+                                    regenerate = True
+                                    break
+                                else:
+                                    print("  Returning to menu ...\n")
+                                    regenerate = False
+                                    break
                     elif sub == "2":
                         feedback = _inp("Describe what needs to change:\n  > ")
                         sep = "\n" if reqs.extra_notes else ""

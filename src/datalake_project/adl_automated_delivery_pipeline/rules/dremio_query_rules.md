@@ -150,9 +150,10 @@ Never use `pn`, `sn`, `part_no`, or `serial_no` for `rotables` columns — Dremi
 - Always alias computed columns with meaningful names.
 - Group columns logically: IDs → descriptive text → dates → flags/indicators.
 
-### 2.2 DISTINCT
+### 2.2 DISTINCT and ORDER BY
 - Use `SELECT DISTINCT` when joining dimension tables (department, address) that can cause fan-out duplication.
 - Do NOT use DISTINCT when aggregating — it is redundant and hides bugs.
+- **CRITICAL**: If you use `SELECT DISTINCT`, every column referenced in the `ORDER BY` clause **MUST** be explicitly included in the `SELECT` list. Otherwise, Dremio will fail with: `Validation FAILED: Expression '...' is not in the select clause`.
 
 ### 2.3 JOIN Type Selection
 | Scenario | JOIN Type |
