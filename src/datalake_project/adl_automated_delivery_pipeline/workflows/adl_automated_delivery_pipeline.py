@@ -13,7 +13,7 @@ Start menu:
   [0] Exit
 
 Usage:
-    python adl_automated_delivery_pipeline/workflows/adl_workflow.py
+    python adl_automated_delivery_pipeline/workflows/adl_automated_delivery_pipeline.py
 """
 from __future__ import annotations
 
@@ -1365,6 +1365,64 @@ def _create_ticket_flow() -> dict | None:
     return None
 
 
+# ── GitHub path ───────────────────────────────────────────────────────────────
+
+def _github_flow() -> None:
+    """Interactive chat with the GitHub Version Control Agent."""
+    from adl_automated_delivery_pipeline.agents.github_agent import GitHubAgent
+    
+    _header("GITHUB VERSION CONTROL AGENT")
+    print("  Type your request (e.g., 'commit all files and push' or 'check status')")
+    print("  Type 'exit', 'quit', or '0' to return to main menu.")
+    print(_DIV)
+    
+    agent = GitHubAgent()
+    
+    while True:
+        try:
+            req = _inp("\n  GitHub> ")
+            if req.lower() in ("exit", "quit", "0"):
+                break
+            if not req.strip():
+                continue
+                
+            print("  Agent is running...")
+            res = agent.run(req)
+            print("\n" + res.get("output", "Done.") + "\n")
+        except KeyboardInterrupt:
+            break
+
+def _post_workflow_git_check() -> None:
+    import subprocess
+    from adl_automated_delivery_pipeline.agents.github_agent import GitHubAgent
+    
+    print("\n  Validating local codebase against GitHub version ...", end="", flush=True)
+    try:
+        status_out = subprocess.check_output(["git", "status", "--porcelain"], text=True).strip()
+        branch = subprocess.check_output(["git", "rev-parse", "--abbrev-ref", "HEAD"], text=True).strip()
+        unpushed = ""
+        try:
+            unpushed = subprocess.check_output(["git", "log", f"origin/{branch}..{branch}", "--oneline"], text=True).strip()
+        except Exception:
+            pass
+            
+        if not status_out and not unpushed:
+            print(" done.")
+            print("  [Git] The version is same with respect to github code.\n")
+            return
+            
+        print(" done.")
+        print("  [Git] New changes detected (modified files or unpushed commits).")
+        ans = _inp("  Would you like the GitHub Agent to commit and push these changes? [y/n]: ", required=False)
+        if ans.lower() in ("y", "yes"):
+            print("  Handing over to GitHub Agent...\n")
+            agent = GitHubAgent()
+            res = agent.run("Please check git status, add all changed files, commit them with a descriptive message summarizing the recent pipeline workflow, and push to the remote repository.")
+            print("\n" + res.get("output", "Done.") + "\n")
+    except Exception as e:
+        print(f" (Failed to check git status: {e})")
+
+
 # ── Main ────────────────────────────────────────────────────────────────────────
 
 def main() -> None:
@@ -1389,6 +1447,7 @@ def main() -> None:
     print("  [1]  Work on an existing ticket  (browse sprint)")
     print("  [2]  Browse backlog tickets")
     print("  [3]  Create a new ticket")
+    print("  [4]  GitHub version control assistant")
     print("  [0]  Exit")
     print(_DIV)
 
@@ -1512,6 +1571,11 @@ def main() -> None:
                     print("  Workflow stopped.")
                     return
 
+    # ── Mode 4: GitHub ────────────────────────────────────────────────────────
+    elif mode == "4":
+        _github_flow()
+        return
+
     else:
         print("  Invalid option. Exiting.")
         return
@@ -1577,6 +1641,8 @@ def main() -> None:
                         print(f"\n  ERROR: {q_ticket.get('error')}")
 
             _qlik_phase(qlik_reqs, vds_path)
+
+    _post_workflow_git_check()
 
     _header("WORKFLOW COMPLETE")
     print(f"  Ticket  : {reqs.ticket_id if reqs else 'N/A'}")
