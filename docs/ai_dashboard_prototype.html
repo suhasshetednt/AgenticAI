@@ -229,13 +229,13 @@
                         if (msg.includes('QLIK AGENT')) {
                             updateNode('qlik', {status: 'running', time: '...'});
                         }
-                        if (msg.includes('Qlik dashboard generated')) {
+                        if (msg.includes('QLIK SENSE DASHBOARD READY')) {
                             updateNode('qlik', {status: 'completed', time: 'Done'});
                         }
                         if (msg.includes('GITHUB AGENT') || msg.includes('Validating local codebase')) {
                             updateNode('git', {status: 'running', time: '...'});
                         }
-                        if (msg.includes('Pushed changes')) {
+                        if (msg.includes('WORKFLOW COMPLETE')) {
                             updateNode('git', {status: 'completed', time: 'Done'});
                         }
 
