@@ -128,16 +128,11 @@
             }
             return (
                 <svg className="absolute inset-0 pointer-events-none w-full h-full" style={{ zIndex: 0 }}>
-                    <path d={path} stroke="rgba(255,255,255,0.1)" strokeWidth="2" fill="none" />
+                    <path d={path} stroke="rgba(255,255,255,0.15)" strokeWidth="2" fill="none" />
                     {isActive && (
-                        <motion.circle
-                            r="4"
-                            fill="#3B82F6"
-                            style={{ filter: 'drop-shadow(0 0 4px #3B82F6)' }}
-                            animate={{ offsetDistance: ["0%", "100%"] }}
-                            transition={{ duration: 1.5, repeat: Infinity, ease: "linear" }}
-                            style={{ offsetPath: `path('${path}')` }}
-                        />
+                        <circle r="5" fill="#3B82F6" style={{ filter: 'drop-shadow(0 0 8px #3B82F6)' }}>
+                            <animateMotion dur="1.5s" repeatCount="indefinite" path={path} />
+                        </circle>
                     )}
                 </svg>
             );
