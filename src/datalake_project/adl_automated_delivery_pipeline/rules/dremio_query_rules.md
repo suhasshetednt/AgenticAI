@@ -243,6 +243,8 @@ GROUP BY rt."value"
 ### 3.3 Subqueries vs CTEs
 - Prefer CTEs (`WITH`) over nested subqueries for readability and Dremio plan optimisation.
 - Name CTEs after the entity they represent: `WITH employee AS (...)`.
+- **NEVER** use correlated subqueries for finding the "latest" or "max" record (e.g., `WHERE date = (SELECT MAX(date) FROM table WHERE id = outer.id)`). Dremio performs poorly with these.
+- **ALWAYS** use `ROW_NUMBER() OVER (PARTITION BY ... ORDER BY ... DESC)` inside a CTE, and then filter `WHERE row_num = 1` in the main query to get the latest record. Or use a standard `GROUP BY` CTE and join it back.
 
 ### 3.4 LIMIT
 - Always add `LIMIT 100` (or less) in ad-hoc exploration queries.
