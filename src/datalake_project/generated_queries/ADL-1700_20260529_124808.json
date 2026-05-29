@@ -1,0 +1,64 @@
+{
+  "ticket_id": "ADL-1700",
+  "summary": "[APU Health Monitor] Create query for APU Health Monitor in Engine Folder",
+  "generated_at": "20260529_124808",
+  "source_database": "amos_acceptance",
+  "source_tables": [
+    "amos.rotables",
+    "amos.rotables_trend",
+    "amos.aircraft"
+  ],
+  "output_fields": [
+    {
+      "name": "partno",
+      "description": "APU Part Number"
+    },
+    {
+      "name": "serialno",
+      "description": "APU Serial Number"
+    },
+    {
+      "name": "psn",
+      "description": "Unique PSN associated with each APU Serial Number"
+    },
+    {
+      "name": "ac_registr",
+      "description": "Aircraft Registration"
+    },
+    {
+      "name": "ref_date",
+      "description": "Reference Date (latest date only for each APU)"
+    },
+    {
+      "name": "trend_type",
+      "description": "Trend Type (CT5)"
+    },
+    {
+      "name": "event_perfno_i",
+      "description": "Workorder if present"
+    },
+    {
+      "name": "value",
+      "description": "CT5ATP value"
+    },
+    {
+      "name": "ac_typ",
+      "description": "Aircraft Type"
+    }
+  ],
+  "transformations": [
+    "Join rotables table with rotables_trend table on psn field",
+    "Join result with aircraft table on ac_registr field to filter by aircraft type",
+    "For each APU (identified by psn), select only the row with the maximum ref_date (latest reference date)",
+    "Ensure trend_type equals CT5 for all returned records"
+  ],
+  "acceptance_criteria": [
+    "Query returns APU data only for B737NG aircraft type",
+    "Each APU (PSN) appears only once with its most recent reference date",
+    "All required fields are populated: partno, serialno, psn, ac_registr, ref_date, trend_type, event_perfno_i, value, ac_typ",
+    "CT5ATP values are correctly retrieved from rotables_trend.value column",
+    "Workorder information (event_perfno_i) is included when present",
+    "VDS is created in Engine Folder",
+    "Query executes successfully against AMOS Acceptance environment"
+  ]
+}

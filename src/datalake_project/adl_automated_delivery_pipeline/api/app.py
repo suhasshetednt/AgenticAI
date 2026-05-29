@@ -3,6 +3,7 @@ import os
 from pathlib import Path
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse
+from fastapi.staticfiles import StaticFiles
 import threading
 import queue
 import builtins
@@ -10,6 +11,9 @@ import asyncio
 import json
 
 app = FastAPI()
+
+images_dir = Path(__file__).parent.parent.parent.parent.parent / "image"
+app.mount("/image", StaticFiles(directory=str(images_dir)), name="image")
 
 # Message queues to bridge the sync Python code and the async WebSocket
 input_queue = queue.Queue()
