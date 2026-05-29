@@ -1,4 +1,4 @@
-from langchain.agents import create_react_agent, AgentExecutor
+from langgraph.prebuilt import create_react_agent
 from adl_automated_delivery_pipeline.agents.base import get_llm
 from adl_automated_delivery_pipeline.tools.github_tools import (
     git_status,
@@ -42,17 +42,14 @@ class GitHubAgent:
             tools=_GITHUB_TOOLS,
             prompt=_SYSTEM_PROMPT
         )
-        self.executor = AgentExecutor(
-            agent=self._agent,
-            tools=_GITHUB_TOOLS,
-            verbose=True,
-            handle_parsing_errors=True,
-            max_iterations=5
-        )
 
     def run(self, message: str) -> dict:
         """Execute a version control operation based on the user's natural language request."""
         try:
-            return self.executor.invoke({"messages": [("human", message)]})
+            from langchain_core.messages import HumanMessage
+            state = {"messages": [HumanMessage(content=message)]}
+            result = self._agent.invoke(state, config={"recursion_limit": 10})
+            output_msg = result["messages"][-1]
+            return {"status": "SUCCESS", "output": getattr(output_msg, "content", str(output_msg))}
         except Exception as e:
             return {"status": "ERROR", "error": str(e), "output": f"Agent failed: {e}"}
