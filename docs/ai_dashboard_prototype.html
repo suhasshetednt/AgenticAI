@@ -161,22 +161,32 @@
         const App = () => {
             const [nodes, setNodes] = useState(INITIAL_NODES);
             const [logs, setLogs] = useState([]);
+            const [terminalOutput, setTerminalOutput] = useState([]);
+            const [activePrompt, setActivePrompt] = useState(null);
+            const [inputValue, setInputValue] = useState('');
             const [state, setState] = useState('connecting'); 
             const ws = useRef(null);
-            
-            // Form Selection States
-            const [selectedSprint, setSelectedSprint] = useState('sprint_44');
-            const [selectedAssignee, setSelectedAssignee] = useState('');
-            const [selectedTicket, setSelectedTicket] = useState('');
+            const terminalEndRef = useRef(null);
             
             const addLog = (msg, type = 'info') => {
                 const time = new Date().toLocaleTimeString('en-US', { hour12: false });
                 setLogs(prev => [...prev, { time, source: 'Pipeline', msg, type }]);
             };
 
+            const appendTerminal = (text) => {
+                setTerminalOutput(prev => [...prev, text]);
+            };
+
             const updateNode = (id, updates) => {
                 setNodes(ns => ns.map(n => n.id === id ? { ...n, ...updates } : n));
             };
+
+            // Auto-scroll terminal
+            useEffect(() => {
+                if(terminalEndRef.current) {
+                    terminalEndRef.current.scrollIntoView({ behavior: 'smooth' });
+                }
+            }, [terminalOutput, activePrompt]);
 
             useEffect(() => {
                 ws.current = new WebSocket('ws://localhost:8000/ws');
@@ -187,70 +197,88 @@
                 ws.current.onmessage = (event) => {
                     const data = JSON.parse(event.data);
                     if (data.type === 'log') {
-                        addLog(data.message);
-                        // Infer node state changes from logs
-                        if (data.message.includes('Jira Ticket ID')) updateNode('jira', {status: 'running'});
-                        if (data.message.includes('Writing project documentation')) updateNode('doc', {status: 'running'});
-                        if (data.message.includes('Dremio validation failed')) updateNode('dremio', {status: 'error'});
-                        if (data.message.includes('API Exception Intercepted')) updateNode('dremio', {status: 'healing'});
-                        if (data.message.includes('Building QlikSense dashboard')) updateNode('qlik', {status: 'running'});
-                    } else if (data.type === 'prompt') {
-                        const prompt = data.message;
-                        if (prompt.includes('Select option')) {
-                            setState('menu');
-                        } else if (prompt.includes('Enter the existing Jira Ticket ID')) {
-                            setState('sprint'); // Trigger custom cascade UI instead of raw input
-                        } else if (prompt.includes('Proceed to Documentation')) {
-                            setState('gate_doc');
-                            updateNode('jira', {status: 'completed'});
-                        } else if (prompt.includes('Proceed to Dremio')) {
-                            setState('gate_dremio');
-                            updateNode('doc', {status: 'completed'});
-                        } else if (prompt.includes('Create VDS in Dremio now')) {
-                            setState('gate_sql');
-                            updateNode('dremio', {status: 'waiting'});
-                        } else if (prompt.includes('Select [1/2/3]')) {
-                            setState('gate_sql_action');
-                        } else if (prompt.includes('Build QlikSense dashboard')) {
-                            setState('gate_qlik');
-                            updateNode('dremio', {status: 'completed'});
-                        } else if (prompt.includes('Would you like the GitHub Agent')) {
-                            setState('gate_git');
-                            updateNode('qlik', {status: 'completed'});
-                        } else {
-                            // Generic prompt fallback (auto-yes for now or could show input)
-                            ws.current.send('y');
+                        // Append to the visual terminal
+                        appendTerminal(data.message);
+                        
+                        // Smart Visualization Sync: Detect agent handshakes and status
+                        const msg = data.message;
+                        if (msg.includes('Jira Agent analyzing ticket')) {
+                            updateNode('jira', {status: 'running', time: '...'});
                         }
+                        if (msg.includes('TICKET REQUIREMENTS')) {
+                            updateNode('jira', {status: 'completed', time: 'Done'});
+                        }
+                        if (msg.includes('DOCUMENTATION AGENT')) {
+                            updateNode('doc', {status: 'running', time: '...'});
+                        }
+                        if (msg.includes('Document saved:')) {
+                            updateNode('doc', {status: 'completed', time: 'Done'});
+                        }
+                        if (msg.includes('DREMIO AGENT')) {
+                            updateNode('dremio', {status: 'running', time: '...'});
+                        }
+                        if (msg.includes('Validation FAILED')) {
+                            updateNode('dremio', {status: 'error'});
+                        }
+                        if (msg.includes('Intercepting error') || msg.includes('auto-fix') || msg.includes('Rewriting SQL')) {
+                            updateNode('dremio', {status: 'healing'});
+                        }
+                        if (msg.includes('VDS created successfully')) {
+                            updateNode('dremio', {status: 'completed', time: 'Done'});
+                        }
+                        if (msg.includes('QLIK AGENT')) {
+                            updateNode('qlik', {status: 'running', time: '...'});
+                        }
+                        if (msg.includes('Qlik dashboard generated')) {
+                            updateNode('qlik', {status: 'completed', time: 'Done'});
+                        }
+                        if (msg.includes('GITHUB AGENT') || msg.includes('Validating local codebase')) {
+                            updateNode('git', {status: 'running', time: '...'});
+                        }
+                        if (msg.includes('Pushed changes')) {
+                            updateNode('git', {status: 'completed', time: 'Done'});
+                        }
+
+                    } else if (data.type === 'prompt') {
+                        // Backend requires user input
+                        setActivePrompt(data.message);
+                        setState('waiting_input');
+                        
+                        // Infer wait states for graph
+                        if (data.message.includes('Select option') || data.message.includes('Select sprint') || data.message.includes('Select ticket')) {
+                            updateNode('jira', {status: 'waiting'});
+                        }
+                    } else if (data.type === 'error') {
+                        addLog(data.message, 'error');
+                        appendTerminal(`[SYSTEM ERROR] ${data.message}`);
                     } else if (data.type === 'done') {
                         setState('done');
-                        updateNode('git', {status: 'completed'});
                     }
                 };
-                ws.current.onclose = () => addLog('Disconnected from backend.', 'error');
+                ws.current.onclose = () => {
+                    addLog('Disconnected from backend.', 'error');
+                    setState('disconnected');
+                };
                 return () => ws.current.close();
             }, []);
 
-            const sendInput = (value) => {
-                ws.current.send(value);
+            const handleSubmit = (e) => {
+                e.preventDefault();
+                if (!activePrompt) return;
+                
+                // Echo the input to the terminal visually
+                appendTerminal(`${activePrompt}${inputValue}`);
+                
+                // Send to backend
+                ws.current.send(inputValue);
+                
+                setInputValue('');
+                setActivePrompt(null);
                 setState('processing');
+                
+                // Clear waiting states on nodes
+                setNodes(ns => ns.map(n => n.status === 'waiting' ? { ...n, status: 'pending' } : n));
             };
-
-            // Gate Handlers
-            const handleMenuSelect = () => { sendInput("1"); };
-            const handleSprintSubmit = () => { setState('assignee'); };
-            const handleAssigneeSubmit = () => { if(selectedAssignee) setState('ticket'); };
-            
-            const handleTicketSubmit = () => {
-                if(!selectedTicket) return;
-                updateNode('jira', { status: 'running' });
-                sendInput(selectedTicket);
-            };
-
-            const handleProceedDoc = (yes) => sendInput(yes ? "y" : "n");
-            const handleProceedDremio = (yes) => sendInput(yes ? "y" : "n");
-            const handleApproveSql = () => sendInput("1"); // Approve
-            const handleProceedQlik = (yes) => sendInput(yes ? "y" : "n");
-            const handleProceedGit = (yes) => sendInput(yes ? "y" : "n");
 
             return (
                 <div className="flex h-screen w-screen font-sans bg-background text-white overflow-hidden">
@@ -263,23 +291,32 @@
                                 <Network className="text-primary" size={20} />
                                 <h1 className="font-semibold tracking-wide">ADL Workflow Orchestrator</h1>
                             </div>
-                            <button onClick={() => window.location.reload()} className="hover:text-white text-gray-400 transition-colors flex items-center gap-2 text-sm">
-                                <RefreshCw size={14} /> Restart Flow
-                            </button>
+                            <div className="flex items-center gap-4">
+                                {state === 'connecting' && <span className="text-warning text-xs flex items-center gap-2"><Loader2 className="animate-spin" size={14}/> Connecting...</span>}
+                                {state === 'disconnected' && <span className="text-error text-xs flex items-center gap-2"><AlertCircle size={14}/> Offline</span>}
+                                <button onClick={() => window.location.reload()} className="hover:text-white text-gray-400 transition-colors flex items-center gap-2 text-sm bg-white/5 px-3 py-1.5 rounded border border-white/10">
+                                    <RefreshCw size={14} /> Restart
+                                </button>
+                            </div>
                         </div>
 
-                        {/* Nodes Area */}
+                        {/* Nodes Area (3D Graph) */}
                         <div className="flex-1 relative overflow-hidden">
                             {/* Draw Edges */}
                             {EDGES.map((edge, i) => {
                                 const source = nodes.find(n => n.id === edge.source);
                                 const target = nodes.find(n => n.id === edge.target);
                                 let isActive = false;
-                                if ((source.status === 'completed' || source.status === 'waiting') && target.status === 'running') isActive = true;
-                                if (source.id === 'jira' && (state === 'gate_doc' || state === 'running_doc')) isActive = true;
-                                if (source.id === 'doc' && (state === 'gate_dremio' || state === 'running_dremio')) isActive = true;
-                                if (source.id === 'dremio' && (state === 'gate_qlik' || state === 'running_qlik')) isActive = true;
-                                if (source.id === 'qlik' && (state === 'gate_git' || state === 'running_git')) isActive = true;
+                                
+                                // Handshake visual logic based on logs
+                                const lastLog = terminalOutput[terminalOutput.length - 1] || '';
+                                if (source.id === 'jira' && target.id === 'doc' && (lastLog.includes('TICKET REQUIREMENTS') || lastLog.includes('Proceed to Documentation'))) isActive = true;
+                                if (source.id === 'doc' && target.id === 'dremio' && (lastLog.includes('Document saved') || lastLog.includes('Proceed to Dremio'))) isActive = true;
+                                if (source.id === 'dremio' && target.id === 'qlik' && (lastLog.includes('VDS created') || lastLog.includes('Build QlikSense'))) isActive = true;
+                                if (source.id === 'qlik' && target.id === 'git' && lastLog.includes('Codebase modified')) isActive = true;
+
+                                // Fallback generic flow
+                                if (source.status === 'completed' && (target.status === 'running' || target.status === 'healing')) isActive = true;
 
                                 return (
                                     <Edge 
@@ -297,194 +334,48 @@
                             {nodes.map(node => <Node key={node.id} node={node} />)}
                         </div>
 
-                        {/* Bottom Interaction Console */}
-                        <div className="h-56 glass border-t border-white/10 z-20 p-6 flex flex-col justify-center bg-black/60 shadow-[0_-20px_50px_rgba(0,0,0,0.5)] relative">
+                        {/* Bottom Interactive Terminal Console */}
+                        <div className="h-[40vh] glass border-t border-white/10 z-20 flex flex-col bg-black/80 shadow-[0_-20px_50px_rgba(0,0,0,0.5)] relative font-mono text-sm">
                             <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-primary/30 to-transparent"></div>
-                            <div className="max-w-3xl mx-auto w-full">
-                                <AnimatePresence mode="wait">
-                                    {state === 'menu' && (
-                                        <motion.div key="menu" initial={{opacity:0, y:10}} animate={{opacity:1, y:0}} exit={{opacity:0, y:-10}}>
-                                            <h3 className="text-gray-400 text-sm mb-3 font-mono flex items-center gap-2"><LayoutDashboard size={16}/> Select option:</h3>
-                                            <div className="flex gap-4">
-                                                <button onClick={handleMenuSelect} className="flex-1 py-3 px-4 bg-primary hover:bg-blue-500 rounded font-semibold transition-colors">1. Work on an existing ticket</button>
-                                                <button className="flex-1 py-3 px-4 bg-white/5 opacity-50 cursor-not-allowed rounded text-sm">2. Browse backlog</button>
-                                                <button className="flex-1 py-3 px-4 bg-white/5 opacity-50 cursor-not-allowed rounded text-sm">3. Create ticket</button>
-                                            </div>
-                                        </motion.div>
-                                    )}
+                            
+                            <div className="h-8 border-b border-white/10 flex items-center px-4 bg-white/5 text-gray-400 text-xs gap-2">
+                                <Terminal size={14}/> <span>Pipeline Interactive Console</span>
+                            </div>
 
-                                    {state === 'sprint' && (
-                                        <motion.div key="sprint" initial={{opacity:0, y:10}} animate={{opacity:1, y:0}} exit={{opacity:0, y:-10}} className="flex flex-col gap-3">
-                                            <h3 className="text-gray-400 text-sm font-mono flex items-center gap-2"><Layers size={16}/> Select Sprint:</h3>
-                                            <div className="flex gap-4 items-center">
-                                                <select 
-                                                    value={selectedSprint}
-                                                    onChange={(e) => setSelectedSprint(e.target.value)}
-                                                    className="flex-1 bg-[#111] border border-white/20 rounded p-4 text-white font-semibold outline-none focus:border-primary transition-colors cursor-pointer"
-                                                >
-                                                    <option value="sprint_44">ASL Sprint 44 (Current Active Sprint)</option>
-                                                    <option value="sprint_45">ASL Sprint 45 (Future)</option>
-                                                    <option value="sprint_43">ASL Sprint 43 (Closed)</option>
-                                                </select>
-                                                <button onClick={handleSprintSubmit} className="py-4 px-8 bg-success hover:bg-green-600 text-black font-bold rounded flex items-center gap-2 transition-colors">
-                                                    Continue <Check size={16}/>
-                                                </button>
-                                            </div>
-                                        </motion.div>
-                                    )}
-
-                                    {state === 'assignee' && (
-                                        <motion.div key="assignee" initial={{opacity:0, y:10}} animate={{opacity:1, y:0}} exit={{opacity:0, y:-10}} className="flex flex-col gap-3">
-                                            <h3 className="text-gray-400 text-sm font-mono flex items-center gap-2"><Users size={16}/> Select Assignee:</h3>
-                                            <div className="flex gap-4 items-center">
-                                                <select 
-                                                    value={selectedAssignee}
-                                                    onChange={(e) => setSelectedAssignee(e.target.value)}
-                                                    className="flex-1 bg-[#111] border border-white/20 rounded p-4 text-white font-semibold outline-none focus:border-primary transition-colors cursor-pointer"
-                                                >
-                                                    <option value="" disabled>-- Select an Assignee --</option>
-                                                    <option value="suhas">Suhas Shete</option>
-                                                    <option value="john">John Doe</option>
-                                                    <option value="jane">Jane Smith</option>
-                                                </select>
-                                                <button onClick={handleAssigneeSubmit} disabled={!selectedAssignee} className={`py-4 px-8 font-bold rounded flex items-center gap-2 transition-colors ${selectedAssignee ? 'bg-success hover:bg-green-600 text-black' : 'bg-gray-700 text-gray-400 cursor-not-allowed'}`}>
-                                                    Continue <Check size={16}/>
-                                                </button>
-                                            </div>
-                                        </motion.div>
-                                    )}
-
-                                    {state === 'ticket' && (
-                                        <motion.div key="ticket" initial={{opacity:0, y:10}} animate={{opacity:1, y:0}} exit={{opacity:0, y:-10}} className="flex flex-col gap-3">
-                                            <h3 className="text-gray-400 text-sm font-mono flex items-center gap-2"><FileText size={16}/> Select Ticket assigned to {selectedAssignee}:</h3>
-                                            <div className="flex gap-4 items-center">
-                                                <select 
-                                                    value={selectedTicket}
-                                                    onChange={(e) => setSelectedTicket(e.target.value)}
-                                                    className="flex-1 bg-[#111] border border-white/20 rounded p-4 text-white font-semibold outline-none focus:border-primary transition-colors cursor-pointer"
-                                                >
-                                                    <option value="" disabled>-- Select a Ticket --</option>
-                                                    <option value="ADL-1684">ADL-1684: Build APU Health Monitor Dashboard via Dremio (IN PROGRESS)</option>
-                                                    <option value="ADL-1685">ADL-1685: Fix data pipeline latency (TO DO)</option>
-                                                </select>
-                                                <button onClick={handleTicketSubmit} disabled={!selectedTicket} className={`py-4 px-8 font-bold rounded flex items-center gap-2 transition-all shadow-[0_0_20px_rgba(59,130,246,0.3)] ${selectedTicket ? 'bg-primary hover:bg-blue-500 text-white' : 'bg-gray-700 shadow-none text-gray-400 cursor-not-allowed'}`}>
-                                                    Launch Pipeline <Play fill="currentColor" size={16}/>
-                                                </button>
-                                            </div>
-                                        </motion.div>
-                                    )}
-
-                                    {/* --- Gates --- */}
-                                    {state === 'gate_doc' && (
-                                        <motion.div key="gatedoc" initial={{opacity:0, y:10}} animate={{opacity:1, y:0}} exit={{opacity:0, y:-10}}>
-                                            <h3 className="text-white text-lg mb-4 flex items-center gap-2"><MessageSquare size={18} className="text-warning"/> Proceed to Documentation Agent?</h3>
-                                            <div className="flex gap-4">
-                                                <button onClick={() => handleProceedDoc(true)} className="py-3 px-8 bg-success hover:bg-green-600 text-black font-bold rounded flex items-center gap-2"><Check size={18}/> Yes, Proceed</button>
-                                                <button onClick={() => handleProceedDoc(false)} className="py-3 px-8 bg-error hover:bg-red-600 font-bold rounded flex items-center gap-2"><X size={18}/> No, Abort</button>
-                                            </div>
-                                        </motion.div>
-                                    )}
-
-                                    {state === 'gate_dremio' && (
-                                        <motion.div key="gatedremio" initial={{opacity:0, y:10}} animate={{opacity:1, y:0}} exit={{opacity:0, y:-10}}>
-                                            <h3 className="text-white text-lg mb-4 flex items-center gap-2"><MessageSquare size={18} className="text-warning"/> Proceed to Dremio Agent?</h3>
-                                            <div className="flex gap-4">
-                                                <button onClick={() => handleProceedDremio(true)} className="py-3 px-8 bg-success hover:bg-green-600 text-black font-bold rounded flex items-center gap-2"><Check size={18}/> Yes, Proceed</button>
-                                                <button onClick={() => handleProceedDremio(false)} className="py-3 px-8 bg-error hover:bg-red-600 font-bold rounded flex items-center gap-2"><X size={18}/> No, Abort</button>
-                                            </div>
-                                        </motion.div>
-                                    )}
-
-                                    {state === 'gate_sql_action' && (
-                                        <motion.div key="gatesql" initial={{opacity:0, y:10}} animate={{opacity:1, y:0}} exit={{opacity:0, y:-10}}>
-                                            <h3 className="text-white text-lg mb-4 flex items-center gap-2"><Code size={18} className="text-primary"/> SQL Generated successfully. Choose action:</h3>
-                                            <div className="flex gap-4">
-                                                <button onClick={handleApproveSql} className="flex-1 py-3 bg-primary hover:bg-blue-500 font-bold rounded">[1] Approve and create VDS</button>
-                                                <button onClick={() => sendInput("2")} className="flex-1 py-3 bg-white/10 hover:bg-white/20 rounded">[2] Regenerate with feedback</button>
-                                                <button onClick={() => sendInput("3")} className="flex-1 py-3 bg-error hover:bg-red-600 rounded">[3] Discard and abort</button>
-                                            </div>
-                                        </motion.div>
-                                    )}
-
-                                    {state === 'gate_sql' && (
-                                        <motion.div key="gatecreatevds" initial={{opacity:0, y:10}} animate={{opacity:1, y:0}} exit={{opacity:0, y:-10}}>
-                                            <h3 className="text-white text-lg mb-4 flex items-center gap-2"><Code size={18} className="text-primary"/> Create VDS in Dremio now?</h3>
-                                            <div className="flex gap-4">
-                                                <button onClick={() => sendInput("y")} className="flex-1 py-3 bg-success text-black hover:bg-green-600 font-bold rounded">Yes</button>
-                                                <button onClick={() => sendInput("n")} className="flex-1 py-3 bg-white/10 hover:bg-white/20 rounded">No</button>
-                                            </div>
-                                        </motion.div>
-                                    )}
-
-                                    {state === 'gate_autofix' && (
-                                        <motion.div key="gateautofix" initial={{opacity:0, y:10}} animate={{opacity:1, y:0}} exit={{opacity:0, y:-10}}>
-                                            <h3 className="text-error font-bold text-lg mb-1 flex items-center gap-2"><AlertCircle size={18}/> Dremio Error Caught</h3>
-                                            <p className="text-sm text-gray-400 mb-4">Would you like the Dremio Agent to attempt auto-fix?</p>
-                                            <div className="flex gap-4">
-                                                <button onClick={() => sendInput("y")} className="py-3 px-8 bg-warning hover:bg-yellow-500 text-black font-bold rounded shadow-[0_0_15px_rgba(245,158,11,0.3)] flex items-center gap-2"><RefreshCw size={18}/> Yes, Auto-Fix</button>
-                                                <button onClick={() => sendInput("n")} className="py-3 px-8 bg-white/10 hover:bg-white/20 font-bold rounded">No, Abort</button>
-                                            </div>
-                                        </motion.div>
-                                    )}
-
-                                    {state === 'gate_qlik' && (
-                                        <motion.div key="gateqlik" initial={{opacity:0, y:10}} animate={{opacity:1, y:0}} exit={{opacity:0, y:-10}}>
-                                            <h3 className="text-white text-lg mb-4 flex items-center gap-2"><MessageSquare size={18} className="text-warning"/> Build QlikSense dashboard from this VDS?</h3>
-                                            <div className="flex gap-4">
-                                                <button onClick={() => handleProceedQlik(true)} className="py-3 px-8 bg-success hover:bg-green-600 text-black font-bold rounded flex items-center gap-2"><Check size={18}/> Yes, Proceed</button>
-                                                <button onClick={() => handleProceedQlik(false)} className="py-3 px-8 bg-error hover:bg-red-600 font-bold rounded flex items-center gap-2"><X size={18}/> No, Abort</button>
-                                            </div>
-                                        </motion.div>
-                                    )}
-
-                                    {state === 'gate_git' && (
-                                        <motion.div key="gategit" initial={{opacity:0, y:10}} animate={{opacity:1, y:0}} exit={{opacity:0, y:-10}}>
-                                            <h3 className="text-white text-lg mb-4 flex items-center gap-2"><GitCommit size={18} className="text-primary"/> Codebase modified. Commit and push these changes?</h3>
-                                            <div className="flex gap-4">
-                                                <button onClick={() => handleProceedGit(true)} className="py-3 px-8 bg-primary hover:bg-blue-500 font-bold rounded flex items-center gap-2"><Check size={18}/> Yes, Commit & Push</button>
-                                                <button onClick={() => handleProceedGit(false)} className="py-3 px-8 bg-white/10 hover:bg-white/20 font-bold rounded flex items-center gap-2"><X size={18}/> No, skip</button>
-                                            </div>
-                                        </motion.div>
-                                    )}
-
-                                    {state === 'done' && (
-                                        <motion.div key="done" initial={{opacity:0, y:10}} animate={{opacity:1, y:0}} exit={{opacity:0, y:-10}}>
-                                            <h3 className="text-success text-2xl font-bold flex items-center gap-2"><CheckCircle2 size={24}/> WORKFLOW COMPLETE</h3>
-                                            <p className="text-gray-400 mt-2">The AI Orchestration Pipeline successfully completed all tasks.</p>
-                                        </motion.div>
-                                    )}
-
-                                    {state === 'aborted' && (
-                                        <motion.div key="abort" initial={{opacity:0, y:10}} animate={{opacity:1, y:0}} exit={{opacity:0, y:-10}}>
-                                            <h3 className="text-error text-2xl font-bold flex items-center gap-2"><X size={24}/> WORKFLOW ABORTED</h3>
-                                            <p className="text-gray-400 mt-2">User rejected prompt. Pipeline stopped.</p>
-                                        </motion.div>
-                                    )}
-                                    
-                                    {state === 'processing' && (
-                                        <motion.div key="running" initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}} className="flex items-center gap-3 text-primary h-full">
-                                            <Loader2 size={24} className="animate-spin" />
-                                            <span className="text-lg font-mono tracking-widest uppercase">Executing Backend Script ...</span>
-                                        </motion.div>
-                                    )}
-                                    {state === 'connecting' && (
-                                        <motion.div key="connecting" initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}} className="flex items-center gap-3 text-warning h-full">
-                                            <Loader2 size={24} className="animate-spin" />
-                                            <span className="text-lg font-mono tracking-widest uppercase">Connecting to FastAPI WebSocket ...</span>
-                                        </motion.div>
-                                    )}
-                                </AnimatePresence>
+                            <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-1 text-gray-300">
+                                {terminalOutput.map((line, i) => (
+                                    <div key={i} className="whitespace-pre-wrap leading-relaxed tracking-wide">
+                                        {line}
+                                    </div>
+                                ))}
+                                
+                                {activePrompt && (
+                                    <div className="mt-2 text-primary font-bold flex items-center bg-primary/10 p-2 rounded border border-primary/20">
+                                        <span className="whitespace-pre-wrap">{activePrompt}</span>
+                                        <form onSubmit={handleSubmit} className="flex-1 ml-2">
+                                            <input 
+                                                autoFocus
+                                                type="text" 
+                                                value={inputValue}
+                                                onChange={(e) => setInputValue(e.target.value)}
+                                                className="w-full bg-transparent outline-none text-white font-bold"
+                                            />
+                                        </form>
+                                        <div className="w-2 h-4 bg-primary animate-pulse ml-1" />
+                                    </div>
+                                )}
+                                <div ref={terminalEndRef} />
                             </div>
                         </div>
                     </div>
 
-                    {/* Right Sidebar - Live Activity Feed */}
-                    <div className="w-96 glass border-l border-white/10 z-20 flex flex-col">
+                    {/* Right Sidebar - System Logs */}
+                    <div className="w-80 glass border-l border-white/10 z-20 flex flex-col hidden lg:flex">
                         <div className="h-14 flex items-center px-4 border-b border-white/10 gap-2">
-                            <Terminal size={18} className="text-gray-400"/>
-                            <span className="font-semibold text-sm">Live Activity Stream</span>
+                            <Activity size={18} className="text-gray-400"/>
+                            <span className="font-semibold text-sm">WebSocket Sync</span>
                         </div>
-                        <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-3 font-mono text-xs">
+                        <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-3 font-mono text-[10px]">
                             <AnimatePresence>
                                 {logs.map((log, i) => {
                                     let color = 'text-gray-400', border = 'border-gray-800', bg = 'bg-black/40';
@@ -493,19 +384,16 @@
                                     if (log.type === 'warning') { color = 'text-warning'; border = 'border-warning/50'; bg = 'bg-warning/10'; }
                                     if (log.type === 'info') { color = 'text-primary'; border = 'border-primary/30'; }
                                     return (
-                                        <motion.div key={i} initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className={`p-3 ${bg} rounded border-l-2 ${border} flex flex-col gap-1 shadow-sm`}>
-                                            <div className="flex justify-between text-[10px] text-gray-500">
+                                        <motion.div key={i} initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className={`p-2 ${bg} rounded border-l-2 ${border} flex flex-col gap-1 shadow-sm`}>
+                                            <div className="flex justify-between text-gray-500">
                                                 <span>{log.source}</span>
                                                 <span>{log.time}</span>
                                             </div>
-                                            <div className={`${color} leading-relaxed`}>{log.msg}</div>
+                                            <div className={`${color} leading-snug`}>{log.msg}</div>
                                         </motion.div>
                                     )
                                 })}
                             </AnimatePresence>
-                            {state === 'processing' && (
-                                <motion.div animate={{ opacity: [1, 0] }} transition={{ repeat: Infinity, duration: 0.8 }} className="w-2 h-4 bg-primary mt-2" />
-                            )}
                         </div>
                     </div>
                 </div>
