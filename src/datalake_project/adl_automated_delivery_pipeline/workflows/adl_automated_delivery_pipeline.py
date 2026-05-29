@@ -1615,10 +1615,10 @@ def main() -> None:
     # ── Phase 4: QlikSense Dashboard ──────────────────────────────────────────
     if vds_path:
         ans = _inp("Build QlikSense dashboard from this VDS? [y/n]: ", required=False)
-        if ans.lower() in ("y", "yes"):
+        if ans.lower() in ("y", "yes", "1"):
             qlik_reqs = reqs
             sep_ans = _inp("Is there a separate JIRA ticket for Qlik? [y/n]: ", required=False)
-            if sep_ans.lower() in ("y", "yes"):
+            if sep_ans.lower() in ("y", "yes", "1"):
                 print("\n  [1] Work on an existing Qlik ticket (browse sprint)")
                 print("  [2] Browse Qlik backlog tickets")
                 print("  [0] Cancel / use original ticket")
