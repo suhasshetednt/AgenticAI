@@ -1,6 +1,6 @@
 import subprocess
 import os
-from langchain.tools import tool
+from langchain_core.tools import tool
 from typing import List, Optional
 
 def _run_git(args: List[str]) -> str:
