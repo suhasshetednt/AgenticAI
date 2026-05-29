@@ -1,0 +1,63 @@
+{
+  "ticket_id": "ADL-1700",
+  "summary": "[APU Health Monitor] Create query for APU Health Monitor in Engine Folder",
+  "generated_at": "20260529_122053",
+  "source_database": "amos_acceptance",
+  "source_tables": [
+    "amos.rotables",
+    "amos.rotables_trend",
+    "amos.aircraft"
+  ],
+  "output_fields": [
+    {
+      "name": "partno",
+      "description": "APU Part Number"
+    },
+    {
+      "name": "serialno",
+      "description": "APU Serial Number"
+    },
+    {
+      "name": "psn",
+      "description": "Unique PSN associated with each APU Serial Number"
+    },
+    {
+      "name": "ac_registr",
+      "description": "Aircraft Registration"
+    },
+    {
+      "name": "ref_date",
+      "description": "Reference Date (latest date only for each APU)"
+    },
+    {
+      "name": "trend_type",
+      "description": "Trend Type (CT5)"
+    },
+    {
+      "name": "event_perfno_i",
+      "description": "Workorder if present"
+    },
+    {
+      "name": "value",
+      "description": "CT5ATP value"
+    },
+    {
+      "name": "ac_typ",
+      "description": "Aircraft Type"
+    }
+  ],
+  "transformations": [
+    "Join rotables table with rotables_trend table on psn field",
+    "Join result with aircraft table on ac_registr field to filter by aircraft type",
+    "For each APU (identified by serialno), select only the record with the latest ref_date",
+    "Retain event_perfno_i value only if workorder is present, otherwise null"
+  ],
+  "acceptance_criteria": [
+    "Query returns all APUs of type B737NG with their latest CT5ATP trend data",
+    "Each APU appears only once with its most recent reference date",
+    "All required fields (partno, serialno, psn, ac_registr, ref_date, trend_type, event_perfno_i, value, ac_typ) are populated",
+    "VDS is created in Engine Folder",
+    "Query executes against AMOS Acceptance environment initially, with migration path to AMOS Production upon go-live",
+    "Workorder field (event_perfno_i) is conditionally populated only when present"
+  ]
+}

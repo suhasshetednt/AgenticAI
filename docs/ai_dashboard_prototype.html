@@ -73,11 +73,11 @@
 
         // --- Mock Data & Config ---
         const INITIAL_NODES = [
-            { id: 'jira', label: 'Jira Agent', icon: LayoutDashboard, x: 80, y: 150, status: 'pending', time: '-' },
-            { id: 'doc', label: 'Documentation', icon: FileText, x: 340, y: 150, status: 'pending', time: '-' },
-            { id: 'dremio', label: 'Dremio Agent', icon: Database, x: 340, y: 350, status: 'pending', time: '-' },
-            { id: 'qlik', label: 'Qlik Agent', icon: Activity, x: 600, y: 350, status: 'pending', time: '-' },
-            { id: 'git', label: 'GitHub Agent', icon: GitCommit, x: 860, y: 350, status: 'pending', time: '-' },
+            { id: 'jira', label: 'Jira Agent', icon: LayoutDashboard, x: 80, y: 80, status: 'pending', time: '-' },
+            { id: 'doc', label: 'Documentation', icon: FileText, x: 80, y: 240, status: 'pending', time: '-' },
+            { id: 'dremio', label: 'Dremio Agent', icon: Database, x: 80, y: 400, status: 'pending', time: '-' },
+            { id: 'qlik', label: 'Qlik Agent', icon: Activity, x: 360, y: 400, status: 'pending', time: '-' },
+            { id: 'git', label: 'GitHub Agent', icon: GitCommit, x: 360, y: 560, status: 'pending', time: '-' },
         ];
 
         const EDGES = [
@@ -85,6 +85,7 @@
             { source: 'doc', target: 'dremio' },
             { source: 'dremio', target: 'qlik' },
             { source: 'qlik', target: 'git' },
+            { source: 'qlik', target: 'jira', isCurved: true }
         ];
 
         const Loader2 = (props) => (
@@ -93,8 +94,38 @@
             </svg>
         );
 
-        const Edge = ({ startX, startY, endX, endY, isActive }) => {
-            const path = `M ${startX} ${startY} L ${startX} ${endY} L ${endX} ${endY}`;
+        const Edge = ({ sourceNode, targetNode, isActive, isCurved }) => {
+            const w = 224;
+            const h = 84;
+            
+            let startX, startY, endX, endY, path;
+
+            if (isCurved) {
+                // Draw a nice bezier curve from Qlik back to Jira
+                startX = sourceNode.x + w; 
+                startY = sourceNode.y + h/2;
+                endX = targetNode.x + w;
+                endY = targetNode.y + h/2;
+                path = `M ${startX} ${startY} C ${startX + 150} ${startY}, ${endX + 200} ${endY}, ${endX} ${endY}`;
+            } else {
+                if (Math.abs(sourceNode.y - targetNode.y) < 10) {
+                    // Same row (e.g. Dremio -> Qlik)
+                    startX = sourceNode.x + w;
+                    startY = sourceNode.y + h/2;
+                    endX = targetNode.x;
+                    endY = targetNode.y + h/2;
+                    path = `M ${startX} ${startY} L ${endX} ${endY}`;
+                } else {
+                    // Vertical flow (e.g. Jira -> Doc)
+                    startX = sourceNode.x + w/2;
+                    startY = sourceNode.y + h;
+                    endX = targetNode.x + w/2;
+                    endY = targetNode.y;
+                    
+                    const midY = startY + (endY - startY) / 2;
+                    path = `M ${startX} ${startY} L ${startX} ${midY} L ${endX} ${midY} L ${endX} ${endY}`;
+                }
+            }
             return (
                 <svg className="absolute inset-0 pointer-events-none w-full h-full" style={{ zIndex: 0 }}>
                     <path d={path} stroke="rgba(255,255,255,0.1)" strokeWidth="2" fill="none" />
@@ -314,6 +345,7 @@
                                 if (source.id === 'doc' && target.id === 'dremio' && (lastLog.includes('Document saved') || lastLog.includes('Proceed to Dremio'))) isActive = true;
                                 if (source.id === 'dremio' && target.id === 'qlik' && (lastLog.includes('VDS created') || lastLog.includes('Build QlikSense'))) isActive = true;
                                 if (source.id === 'qlik' && target.id === 'git' && lastLog.includes('Codebase modified')) isActive = true;
+                                if (source.id === 'qlik' && target.id === 'jira' && lastLog.includes('separate JIRA ticket for Qlik?')) isActive = true;
 
                                 // Fallback generic flow
                                 if (source.status === 'completed' && (target.status === 'running' || target.status === 'healing')) isActive = true;
@@ -321,11 +353,10 @@
                                 return (
                                     <Edge 
                                         key={i}
-                                        startX={source.x + 112} 
-                                        startY={source.y + 45} 
-                                        endX={target.x + 112}
-                                        endY={target.y - 10}
+                                        sourceNode={source}
+                                        targetNode={target}
                                         isActive={isActive}
+                                        isCurved={edge.isCurved}
                                     />
                                 );
                             })}
