@@ -19,6 +19,9 @@ app.mount("/image", StaticFiles(directory=str(images_dir)), name="image")
 input_queue = queue.Queue()
 output_queue = queue.Queue()
 
+# Track the active pipeline thread to kill ghost threads when restarting
+active_thread_id = None
+
 class QueueStdout:
     def __init__(self, queue):
         self.queue = queue
@@ -68,6 +71,13 @@ class WebSocketIO:
             self.original_print(safe_msg, **kwargs)
 
     def custom_input(self, prompt=""):
+        global active_thread_id
+        current_id = threading.get_ident()
+        
+        # If this thread was replaced before even asking, die silently
+        if active_thread_id and current_id != active_thread_id:
+            raise SystemExit()
+
         # Send the prompt request to the UI
         output_queue.put({"type": "prompt", "message": prompt})
         try:
@@ -76,8 +86,18 @@ class WebSocketIO:
             encoding = getattr(sys.stdout, "encoding", "utf-8") or 'utf-8'
             safe_prompt = prompt.encode(encoding, errors='replace').decode(encoding)
             self.original_print(safe_prompt, end="", flush=True)
-        # Block the Python thread until the UI sends a response back
-        response = input_queue.get()
+            
+        # Block with a timeout so we can periodically check if we've been replaced (Ghost Thread Killer)
+        while True:
+            # Check if a new workflow was started while we were waiting
+            if active_thread_id and current_id != active_thread_id:
+                raise SystemExit()
+            try:
+                response = input_queue.get(timeout=0.5)
+                break
+            except queue.Empty:
+                continue
+
         try:
             self.original_print(response)
         except UnicodeEncodeError:
@@ -136,6 +156,8 @@ async def websocket_endpoint(websocket: WebSocket):
             data = await websocket.receive_text()
             
             if data == "START_WORKFLOW":
+                global active_thread_id
+                
                 # Clear queues to prevent ghost threads from stealing inputs if the user restarted
                 while not input_queue.empty():
                     try: input_queue.get_nowait()
@@ -147,6 +169,8 @@ async def websocket_endpoint(websocket: WebSocket):
                 # Start the LangGraph pipeline in a background thread only on manual trigger
                 t = threading.Thread(target=run_pipeline, daemon=True)
                 t.start()
+                active_thread_id = t.ident
+                
                 output_queue.put({"type": "log", "message": "Initiating workflow execution..."})
             else:
                 input_queue.put(data)
