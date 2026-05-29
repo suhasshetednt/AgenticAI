@@ -46,6 +46,9 @@
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 10px; }
         ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.2); }
+        
+        /* Custom Select */
+        select { appearance: none; background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e"); background-repeat: no-repeat; background-position: right 1rem center; background-size: 1em; }
     </style>
 </head>
 <body>
@@ -66,7 +69,7 @@
         import React, { useState, useEffect, useRef } from 'react';
         import { createRoot } from 'react-dom/client';
         import { motion, AnimatePresence } from 'framer-motion';
-        import { Terminal, Activity, GitCommit, Database, FileText, CheckCircle2, Clock, LayoutDashboard, Cpu, Network, AlertCircle, RefreshCw, Layers, MessageSquare, Check, X, Code } from 'lucide-react';
+        import { Terminal, Activity, GitCommit, Database, FileText, CheckCircle2, Clock, LayoutDashboard, Cpu, Network, AlertCircle, RefreshCw, Layers, MessageSquare, Check, X, Code, Users, Play } from 'lucide-react';
 
         // --- Mock Data & Config ---
         const INITIAL_NODES = [
@@ -160,6 +163,11 @@
             const [logs, setLogs] = useState([]);
             const [state, setState] = useState('menu'); 
             
+            // Form Selection States
+            const [selectedSprint, setSelectedSprint] = useState('sprint_44');
+            const [selectedAssignee, setSelectedAssignee] = useState('');
+            const [selectedTicket, setSelectedTicket] = useState('');
+            
             const addLog = (source, msg, type = 'info') => {
                 const time = new Date().toLocaleTimeString('en-US', { hour12: false });
                 setLogs(prev => [...prev, { time, source, msg, type }]);
@@ -171,17 +179,22 @@
 
             // Gate Handlers
             const handleMenuSelect = () => { setState('sprint'); };
-            const handleSprintSelect = () => { setState('ticket'); };
+            const handleSprintSubmit = () => { setState('assignee'); };
+            const handleAssigneeSubmit = () => { if(selectedAssignee) setState('ticket'); };
             
-            const handleTicketSelect = () => {
+            const handleTicketSubmit = () => {
+                if(!selectedTicket) return;
                 setState('running_jira');
                 updateNode('jira', { status: 'running', time: '...' });
-                addLog('JiraAgent', 'Extracting requirements for ADL-1684...', 'info');
+                addLog('System', `Initiating workflow for ${selectedTicket}...`, 'info');
+                setTimeout(() => {
+                    addLog('JiraAgent', 'Extracting requirements and business logic...', 'info');
+                }, 1000);
                 setTimeout(() => {
                     addLog('JiraAgent', 'Requirements parsed successfully.', 'success');
                     updateNode('jira', { status: 'waiting', time: '1.2s' });
                     setState('gate_doc');
-                }, 2000);
+                }, 3000);
             };
 
             const handleProceedDoc = (yes) => {
@@ -308,12 +321,13 @@
                         </div>
 
                         {/* Bottom Interaction Console */}
-                        <div className="h-48 glass border-t border-white/10 z-20 p-6 flex flex-col justify-center bg-black/60 shadow-[0_-20px_50px_rgba(0,0,0,0.5)]">
+                        <div className="h-56 glass border-t border-white/10 z-20 p-6 flex flex-col justify-center bg-black/60 shadow-[0_-20px_50px_rgba(0,0,0,0.5)] relative">
+                            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-primary/30 to-transparent"></div>
                             <div className="max-w-3xl mx-auto w-full">
                                 <AnimatePresence mode="wait">
                                     {state === 'menu' && (
                                         <motion.div key="menu" initial={{opacity:0, y:10}} animate={{opacity:1, y:0}} exit={{opacity:0, y:-10}}>
-                                            <h3 className="text-gray-400 text-sm mb-3 font-mono">Select option:</h3>
+                                            <h3 className="text-gray-400 text-sm mb-3 font-mono flex items-center gap-2"><LayoutDashboard size={16}/> Select option:</h3>
                                             <div className="flex gap-4">
                                                 <button onClick={handleMenuSelect} className="flex-1 py-3 px-4 bg-primary hover:bg-blue-500 rounded font-semibold transition-colors">1. Work on an existing ticket</button>
                                                 <button className="flex-1 py-3 px-4 bg-white/5 opacity-50 cursor-not-allowed rounded text-sm">2. Browse backlog</button>
@@ -323,31 +337,73 @@
                                     )}
 
                                     {state === 'sprint' && (
-                                        <motion.div key="sprint" initial={{opacity:0, y:10}} animate={{opacity:1, y:0}} exit={{opacity:0, y:-10}}>
-                                            <h3 className="text-gray-400 text-sm mb-3 font-mono">Select Sprint:</h3>
-                                            <div className="flex gap-4">
-                                                <button onClick={handleSprintSelect} className="flex-1 py-3 px-4 bg-primary hover:bg-blue-500 rounded font-semibold transition-colors">ASL Sprint 44</button>
-                                                <button className="flex-1 py-3 px-4 bg-white/5 hover:bg-white/10 rounded transition-colors">ASL Sprint 45</button>
+                                        <motion.div key="sprint" initial={{opacity:0, y:10}} animate={{opacity:1, y:0}} exit={{opacity:0, y:-10}} className="flex flex-col gap-3">
+                                            <h3 className="text-gray-400 text-sm font-mono flex items-center gap-2"><Layers size={16}/> Select Sprint:</h3>
+                                            <div className="flex gap-4 items-center">
+                                                <select 
+                                                    value={selectedSprint}
+                                                    onChange={(e) => setSelectedSprint(e.target.value)}
+                                                    className="flex-1 bg-[#111] border border-white/20 rounded p-4 text-white font-semibold outline-none focus:border-primary transition-colors cursor-pointer"
+                                                >
+                                                    <option value="sprint_44">ASL Sprint 44 (Current Active Sprint)</option>
+                                                    <option value="sprint_45">ASL Sprint 45 (Future)</option>
+                                                    <option value="sprint_43">ASL Sprint 43 (Closed)</option>
+                                                </select>
+                                                <button onClick={handleSprintSubmit} className="py-4 px-8 bg-success hover:bg-green-600 text-black font-bold rounded flex items-center gap-2 transition-colors">
+                                                    Continue <Check size={16}/>
+                                                </button>
+                                            </div>
+                                        </motion.div>
+                                    )}
+
+                                    {state === 'assignee' && (
+                                        <motion.div key="assignee" initial={{opacity:0, y:10}} animate={{opacity:1, y:0}} exit={{opacity:0, y:-10}} className="flex flex-col gap-3">
+                                            <h3 className="text-gray-400 text-sm font-mono flex items-center gap-2"><Users size={16}/> Select Assignee:</h3>
+                                            <div className="flex gap-4 items-center">
+                                                <select 
+                                                    value={selectedAssignee}
+                                                    onChange={(e) => setSelectedAssignee(e.target.value)}
+                                                    className="flex-1 bg-[#111] border border-white/20 rounded p-4 text-white font-semibold outline-none focus:border-primary transition-colors cursor-pointer"
+                                                >
+                                                    <option value="" disabled>-- Select an Assignee --</option>
+                                                    <option value="suhas">Suhas Shete</option>
+                                                    <option value="john">John Doe</option>
+                                                    <option value="jane">Jane Smith</option>
+                                                </select>
+                                                <button onClick={handleAssigneeSubmit} disabled={!selectedAssignee} className={`py-4 px-8 font-bold rounded flex items-center gap-2 transition-colors ${selectedAssignee ? 'bg-success hover:bg-green-600 text-black' : 'bg-gray-700 text-gray-400 cursor-not-allowed'}`}>
+                                                    Continue <Check size={16}/>
+                                                </button>
                                             </div>
                                         </motion.div>
                                     )}
 
                                     {state === 'ticket' && (
-                                        <motion.div key="ticket" initial={{opacity:0, y:10}} animate={{opacity:1, y:0}} exit={{opacity:0, y:-10}}>
-                                            <h3 className="text-gray-400 text-sm mb-3 font-mono">Select Ticket:</h3>
-                                            <button onClick={handleTicketSelect} className="w-full py-4 px-6 bg-primary hover:bg-blue-500 rounded font-semibold transition-colors text-left flex justify-between items-center">
-                                                <span>ADL-1684 (Build APU Health Monitor Dashboard via Dremio)</span>
-                                                <span className="text-xs bg-black/30 px-2 py-1 rounded">IN PROGRESS</span>
-                                            </button>
+                                        <motion.div key="ticket" initial={{opacity:0, y:10}} animate={{opacity:1, y:0}} exit={{opacity:0, y:-10}} className="flex flex-col gap-3">
+                                            <h3 className="text-gray-400 text-sm font-mono flex items-center gap-2"><FileText size={16}/> Select Ticket assigned to {selectedAssignee}:</h3>
+                                            <div className="flex gap-4 items-center">
+                                                <select 
+                                                    value={selectedTicket}
+                                                    onChange={(e) => setSelectedTicket(e.target.value)}
+                                                    className="flex-1 bg-[#111] border border-white/20 rounded p-4 text-white font-semibold outline-none focus:border-primary transition-colors cursor-pointer"
+                                                >
+                                                    <option value="" disabled>-- Select a Ticket --</option>
+                                                    <option value="ADL-1684">ADL-1684: Build APU Health Monitor Dashboard via Dremio (IN PROGRESS)</option>
+                                                    <option value="ADL-1685">ADL-1685: Fix data pipeline latency (TO DO)</option>
+                                                </select>
+                                                <button onClick={handleTicketSubmit} disabled={!selectedTicket} className={`py-4 px-8 font-bold rounded flex items-center gap-2 transition-all shadow-[0_0_20px_rgba(59,130,246,0.3)] ${selectedTicket ? 'bg-primary hover:bg-blue-500 text-white' : 'bg-gray-700 shadow-none text-gray-400 cursor-not-allowed'}`}>
+                                                    Launch Pipeline <Play fill="currentColor" size={16}/>
+                                                </button>
+                                            </div>
                                         </motion.div>
                                     )}
 
+                                    {/* --- Gates --- */}
                                     {state === 'gate_doc' && (
                                         <motion.div key="gatedoc" initial={{opacity:0, y:10}} animate={{opacity:1, y:0}} exit={{opacity:0, y:-10}}>
                                             <h3 className="text-white text-lg mb-4 flex items-center gap-2"><MessageSquare size={18} className="text-warning"/> Proceed to Documentation Agent?</h3>
                                             <div className="flex gap-4">
-                                                <button onClick={() => handleProceedDoc(true)} className="py-2 px-8 bg-success hover:bg-green-600 text-black font-bold rounded flex items-center gap-2"><Check size={16}/> Yes</button>
-                                                <button onClick={() => handleProceedDoc(false)} className="py-2 px-8 bg-error hover:bg-red-600 font-bold rounded flex items-center gap-2"><X size={16}/> No</button>
+                                                <button onClick={() => handleProceedDoc(true)} className="py-3 px-8 bg-success hover:bg-green-600 text-black font-bold rounded flex items-center gap-2"><Check size={18}/> Yes, Proceed</button>
+                                                <button onClick={() => handleProceedDoc(false)} className="py-3 px-8 bg-error hover:bg-red-600 font-bold rounded flex items-center gap-2"><X size={18}/> No, Abort</button>
                                             </div>
                                         </motion.div>
                                     )}
@@ -356,8 +412,8 @@
                                         <motion.div key="gatedremio" initial={{opacity:0, y:10}} animate={{opacity:1, y:0}} exit={{opacity:0, y:-10}}>
                                             <h3 className="text-white text-lg mb-4 flex items-center gap-2"><MessageSquare size={18} className="text-warning"/> Proceed to Dremio Agent?</h3>
                                             <div className="flex gap-4">
-                                                <button onClick={() => handleProceedDremio(true)} className="py-2 px-8 bg-success hover:bg-green-600 text-black font-bold rounded flex items-center gap-2"><Check size={16}/> Yes</button>
-                                                <button onClick={() => handleProceedDremio(false)} className="py-2 px-8 bg-error hover:bg-red-600 font-bold rounded flex items-center gap-2"><X size={16}/> No</button>
+                                                <button onClick={() => handleProceedDremio(true)} className="py-3 px-8 bg-success hover:bg-green-600 text-black font-bold rounded flex items-center gap-2"><Check size={18}/> Yes, Proceed</button>
+                                                <button onClick={() => handleProceedDremio(false)} className="py-3 px-8 bg-error hover:bg-red-600 font-bold rounded flex items-center gap-2"><X size={18}/> No, Abort</button>
                                             </div>
                                         </motion.div>
                                     )}
@@ -366,9 +422,9 @@
                                         <motion.div key="gatesql" initial={{opacity:0, y:10}} animate={{opacity:1, y:0}} exit={{opacity:0, y:-10}}>
                                             <h3 className="text-white text-lg mb-4 flex items-center gap-2"><Code size={18} className="text-primary"/> SQL Generated successfully. Choose action:</h3>
                                             <div className="flex gap-4">
-                                                <button onClick={handleApproveSql} className="flex-1 py-3 bg-primary hover:bg-blue-500 font-bold rounded">[1] Approve and save to file</button>
+                                                <button onClick={handleApproveSql} className="flex-1 py-3 bg-primary hover:bg-blue-500 font-bold rounded">[1] Approve and create VDS</button>
                                                 <button className="flex-1 py-3 bg-white/10 hover:bg-white/20 rounded">[2] Regenerate with feedback</button>
-                                                <button className="flex-1 py-3 bg-error hover:bg-red-600 rounded">[3] Discard and return to menu</button>
+                                                <button className="flex-1 py-3 bg-error hover:bg-red-600 rounded">[3] Discard and abort</button>
                                             </div>
                                         </motion.div>
                                     )}
@@ -378,8 +434,8 @@
                                             <h3 className="text-error font-bold text-lg mb-1 flex items-center gap-2"><AlertCircle size={18}/> Dremio API Validation Failed</h3>
                                             <p className="text-sm text-gray-400 mb-4">Would you like the Dremio Agent to auto-fix this error?</p>
                                             <div className="flex gap-4">
-                                                <button onClick={() => handleAutofix(true)} className="py-2 px-8 bg-warning hover:bg-yellow-500 text-black font-bold rounded shadow-[0_0_15px_rgba(245,158,11,0.3)] flex items-center gap-2"><RefreshCw size={16}/> Yes, Auto-Fix</button>
-                                                <button onClick={() => handleAutofix(false)} className="py-2 px-8 bg-white/10 hover:bg-white/20 font-bold rounded">No, Abort</button>
+                                                <button onClick={() => handleAutofix(true)} className="py-3 px-8 bg-warning hover:bg-yellow-500 text-black font-bold rounded shadow-[0_0_15px_rgba(245,158,11,0.3)] flex items-center gap-2"><RefreshCw size={18}/> Yes, Auto-Fix</button>
+                                                <button onClick={() => handleAutofix(false)} className="py-3 px-8 bg-white/10 hover:bg-white/20 font-bold rounded">No, Abort</button>
                                             </div>
                                         </motion.div>
                                     )}
@@ -388,8 +444,8 @@
                                         <motion.div key="gateqlik" initial={{opacity:0, y:10}} animate={{opacity:1, y:0}} exit={{opacity:0, y:-10}}>
                                             <h3 className="text-white text-lg mb-4 flex items-center gap-2"><MessageSquare size={18} className="text-warning"/> Build QlikSense dashboard from this VDS?</h3>
                                             <div className="flex gap-4">
-                                                <button onClick={() => handleProceedQlik(true)} className="py-2 px-8 bg-success hover:bg-green-600 text-black font-bold rounded flex items-center gap-2"><Check size={16}/> Yes</button>
-                                                <button onClick={() => handleProceedQlik(false)} className="py-2 px-8 bg-error hover:bg-red-600 font-bold rounded flex items-center gap-2"><X size={16}/> No</button>
+                                                <button onClick={() => handleProceedQlik(true)} className="py-3 px-8 bg-success hover:bg-green-600 text-black font-bold rounded flex items-center gap-2"><Check size={18}/> Yes, Proceed</button>
+                                                <button onClick={() => handleProceedQlik(false)} className="py-3 px-8 bg-error hover:bg-red-600 font-bold rounded flex items-center gap-2"><X size={18}/> No, Abort</button>
                                             </div>
                                         </motion.div>
                                     )}
@@ -398,8 +454,8 @@
                                         <motion.div key="gategit" initial={{opacity:0, y:10}} animate={{opacity:1, y:0}} exit={{opacity:0, y:-10}}>
                                             <h3 className="text-white text-lg mb-4 flex items-center gap-2"><GitCommit size={18} className="text-primary"/> Codebase modified. Commit and push these changes?</h3>
                                             <div className="flex gap-4">
-                                                <button onClick={() => handleProceedGit(true)} className="py-2 px-8 bg-primary hover:bg-blue-500 font-bold rounded flex items-center gap-2"><Check size={16}/> Yes</button>
-                                                <button onClick={() => handleProceedGit(false)} className="py-2 px-8 bg-white/10 hover:bg-white/20 font-bold rounded flex items-center gap-2"><X size={16}/> No</button>
+                                                <button onClick={() => handleProceedGit(true)} className="py-3 px-8 bg-primary hover:bg-blue-500 font-bold rounded flex items-center gap-2"><Check size={18}/> Yes, Commit & Push</button>
+                                                <button onClick={() => handleProceedGit(false)} className="py-3 px-8 bg-white/10 hover:bg-white/20 font-bold rounded flex items-center gap-2"><X size={18}/> No, skip</button>
                                             </div>
                                         </motion.div>
                                     )}
@@ -407,7 +463,7 @@
                                     {state === 'done' && (
                                         <motion.div key="done" initial={{opacity:0, y:10}} animate={{opacity:1, y:0}} exit={{opacity:0, y:-10}}>
                                             <h3 className="text-success text-2xl font-bold flex items-center gap-2"><CheckCircle2 size={24}/> WORKFLOW COMPLETE</h3>
-                                            <p className="text-gray-400 mt-2">Ticket ADL-1684 has been fully processed and deployed.</p>
+                                            <p className="text-gray-400 mt-2">The AI Orchestration Pipeline successfully completed all tasks.</p>
                                         </motion.div>
                                     )}
 
@@ -419,9 +475,9 @@
                                     )}
                                     
                                     {(state.startsWith('running_') || state === 'dremio_healing') && (
-                                        <motion.div key="running" initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}} className="flex items-center gap-3 text-primary">
+                                        <motion.div key="running" initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}} className="flex items-center gap-3 text-primary h-full">
                                             <Loader2 size={24} className="animate-spin" />
-                                            <span className="text-lg font-mono tracking-widest uppercase">Agent Executing ...</span>
+                                            <span className="text-lg font-mono tracking-widest uppercase">Executing Background Agents ...</span>
                                         </motion.div>
                                     )}
                                 </AnimatePresence>
@@ -454,7 +510,9 @@
                                     )
                                 })}
                             </AnimatePresence>
-                            <motion.div animate={{ opacity: [1, 0] }} transition={{ repeat: Infinity, duration: 0.8 }} className="w-2 h-4 bg-primary mt-2" />
+                            {(state.startsWith('running_') || state === 'dremio_healing') && (
+                                <motion.div animate={{ opacity: [1, 0] }} transition={{ repeat: Infinity, duration: 0.8 }} className="w-2 h-4 bg-primary mt-2" />
+                            )}
                         </div>
                     </div>
                 </div>
