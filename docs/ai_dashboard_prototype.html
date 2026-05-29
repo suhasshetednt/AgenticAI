@@ -161,119 +161,96 @@
         const App = () => {
             const [nodes, setNodes] = useState(INITIAL_NODES);
             const [logs, setLogs] = useState([]);
-            const [state, setState] = useState('menu'); 
+            const [state, setState] = useState('connecting'); 
+            const ws = useRef(null);
             
             // Form Selection States
             const [selectedSprint, setSelectedSprint] = useState('sprint_44');
             const [selectedAssignee, setSelectedAssignee] = useState('');
             const [selectedTicket, setSelectedTicket] = useState('');
             
-            const addLog = (source, msg, type = 'info') => {
+            const addLog = (msg, type = 'info') => {
                 const time = new Date().toLocaleTimeString('en-US', { hour12: false });
-                setLogs(prev => [...prev, { time, source, msg, type }]);
+                setLogs(prev => [...prev, { time, source: 'Pipeline', msg, type }]);
             };
 
             const updateNode = (id, updates) => {
                 setNodes(ns => ns.map(n => n.id === id ? { ...n, ...updates } : n));
             };
 
+            useEffect(() => {
+                ws.current = new WebSocket('ws://localhost:8000/ws');
+                ws.current.onopen = () => {
+                    addLog('Connected to Orchestration Backend.', 'success');
+                    setState('idle');
+                };
+                ws.current.onmessage = (event) => {
+                    const data = JSON.parse(event.data);
+                    if (data.type === 'log') {
+                        addLog(data.message);
+                        // Infer node state changes from logs
+                        if (data.message.includes('Jira Ticket ID')) updateNode('jira', {status: 'running'});
+                        if (data.message.includes('Writing project documentation')) updateNode('doc', {status: 'running'});
+                        if (data.message.includes('Dremio validation failed')) updateNode('dremio', {status: 'error'});
+                        if (data.message.includes('API Exception Intercepted')) updateNode('dremio', {status: 'healing'});
+                        if (data.message.includes('Building QlikSense dashboard')) updateNode('qlik', {status: 'running'});
+                    } else if (data.type === 'prompt') {
+                        const prompt = data.message;
+                        if (prompt.includes('Select option')) {
+                            setState('menu');
+                        } else if (prompt.includes('Enter the existing Jira Ticket ID')) {
+                            setState('sprint'); // Trigger custom cascade UI instead of raw input
+                        } else if (prompt.includes('Proceed to Documentation')) {
+                            setState('gate_doc');
+                            updateNode('jira', {status: 'completed'});
+                        } else if (prompt.includes('Proceed to Dremio')) {
+                            setState('gate_dremio');
+                            updateNode('doc', {status: 'completed'});
+                        } else if (prompt.includes('Create VDS in Dremio now')) {
+                            setState('gate_sql');
+                            updateNode('dremio', {status: 'waiting'});
+                        } else if (prompt.includes('Select [1/2/3]')) {
+                            setState('gate_sql_action');
+                        } else if (prompt.includes('Build QlikSense dashboard')) {
+                            setState('gate_qlik');
+                            updateNode('dremio', {status: 'completed'});
+                        } else if (prompt.includes('Would you like the GitHub Agent')) {
+                            setState('gate_git');
+                            updateNode('qlik', {status: 'completed'});
+                        } else {
+                            // Generic prompt fallback (auto-yes for now or could show input)
+                            ws.current.send('y');
+                        }
+                    } else if (data.type === 'done') {
+                        setState('done');
+                        updateNode('git', {status: 'completed'});
+                    }
+                };
+                ws.current.onclose = () => addLog('Disconnected from backend.', 'error');
+                return () => ws.current.close();
+            }, []);
+
+            const sendInput = (value) => {
+                ws.current.send(value);
+                setState('processing');
+            };
+
             // Gate Handlers
-            const handleMenuSelect = () => { setState('sprint'); };
+            const handleMenuSelect = () => { sendInput("1"); };
             const handleSprintSubmit = () => { setState('assignee'); };
             const handleAssigneeSubmit = () => { if(selectedAssignee) setState('ticket'); };
             
             const handleTicketSubmit = () => {
                 if(!selectedTicket) return;
-                setState('running_jira');
-                updateNode('jira', { status: 'running', time: '...' });
-                addLog('System', `Initiating workflow for ${selectedTicket}...`, 'info');
-                setTimeout(() => {
-                    addLog('JiraAgent', 'Extracting requirements and business logic...', 'info');
-                }, 1000);
-                setTimeout(() => {
-                    addLog('JiraAgent', 'Requirements parsed successfully.', 'success');
-                    updateNode('jira', { status: 'waiting', time: '1.2s' });
-                    setState('gate_doc');
-                }, 3000);
+                updateNode('jira', { status: 'running' });
+                sendInput(selectedTicket);
             };
 
-            const handleProceedDoc = (yes) => {
-                if(!yes) { setState('aborted'); return; }
-                setState('running_doc');
-                updateNode('jira', { status: 'completed' });
-                updateNode('doc', { status: 'running', time: '...' });
-                addLog('DocAgent', 'Generating Technical Implementation Document...', 'info');
-                setTimeout(() => {
-                    addLog('DocAgent', 'Project Documentation.docx saved.', 'success');
-                    updateNode('doc', { status: 'waiting', time: '4.2s' });
-                    setState('gate_dremio');
-                }, 2000);
-            };
-
-            const handleProceedDremio = (yes) => {
-                if(!yes) { setState('aborted'); return; }
-                setState('running_dremio');
-                updateNode('doc', { status: 'completed' });
-                updateNode('dremio', { status: 'running', time: '...' });
-                addLog('DremioAgent', 'Translating logic into Dremio SQL...', 'info');
-                setTimeout(() => {
-                    addLog('DremioAgent', 'SQL Generated. Waiting for user approval...', 'warning');
-                    updateNode('dremio', { status: 'waiting' });
-                    setState('gate_sql');
-                }, 2000);
-            };
-
-            const handleApproveSql = () => {
-                setState('running_vds');
-                updateNode('dremio', { status: 'running' });
-                addLog('DremioAgent', 'Validating SQL against Dremio API before VDS creation...', 'info');
-                setTimeout(() => {
-                    addLog('DremioAPI', "Validation FAILED: Expression 'rt.ref_date' is not in the select clause", 'error');
-                    updateNode('dremio', { status: 'error' });
-                    setState('gate_autofix');
-                }, 2000);
-            };
-
-            const handleAutofix = (yes) => {
-                if(!yes) { setState('aborted'); return; }
-                setState('running_healing');
-                updateNode('dremio', { status: 'healing' });
-                addLog('DremioAgent', 'Intercepted error. Applying Auto-Heal rule (Rule 2.2)...', 'warning');
-                setTimeout(() => {
-                    addLog('DremioAgent', 'SQL Rewritten. Retrying VDS creation...', 'info');
-                }, 2000);
-                setTimeout(() => {
-                    addLog('DremioAPI', 'VDS created successfully: dremio-db.apu_health', 'success');
-                    updateNode('dremio', { status: 'waiting', time: '8.5s' });
-                    setState('gate_qlik');
-                }, 4000);
-            };
-
-            const handleProceedQlik = (yes) => {
-                if(!yes) { setState('aborted'); return; }
-                setState('running_qlik');
-                updateNode('dremio', { status: 'completed' });
-                updateNode('qlik', { status: 'running', time: '...' });
-                addLog('QlikAgent', 'Connecting to Qlik Sense Cloud...', 'info');
-                setTimeout(() => {
-                    addLog('QlikAgent', 'Dashboard provisioned.', 'success');
-                    updateNode('qlik', { status: 'waiting', time: '3.1s' });
-                    setState('gate_git');
-                }, 2000);
-            };
-
-            const handleProceedGit = (yes) => {
-                if(!yes) { setState('done'); updateNode('qlik', {status:'completed'}); return; }
-                setState('running_git');
-                updateNode('qlik', { status: 'completed' });
-                updateNode('git', { status: 'running', time: '...' });
-                addLog('GitAgent', 'Staging 4 modified files...', 'info');
-                setTimeout(() => {
-                    addLog('GitAgent', 'Pushed changes to origin/main.', 'success');
-                    updateNode('git', { status: 'completed', time: '2.5s' });
-                    setState('done');
-                }, 2500);
-            };
+            const handleProceedDoc = (yes) => sendInput(yes ? "y" : "n");
+            const handleProceedDremio = (yes) => sendInput(yes ? "y" : "n");
+            const handleApproveSql = () => sendInput("1"); // Approve
+            const handleProceedQlik = (yes) => sendInput(yes ? "y" : "n");
+            const handleProceedGit = (yes) => sendInput(yes ? "y" : "n");
 
             return (
                 <div className="flex h-screen w-screen font-sans bg-background text-white overflow-hidden">
@@ -418,24 +395,34 @@
                                         </motion.div>
                                     )}
 
-                                    {state === 'gate_sql' && (
+                                    {state === 'gate_sql_action' && (
                                         <motion.div key="gatesql" initial={{opacity:0, y:10}} animate={{opacity:1, y:0}} exit={{opacity:0, y:-10}}>
                                             <h3 className="text-white text-lg mb-4 flex items-center gap-2"><Code size={18} className="text-primary"/> SQL Generated successfully. Choose action:</h3>
                                             <div className="flex gap-4">
                                                 <button onClick={handleApproveSql} className="flex-1 py-3 bg-primary hover:bg-blue-500 font-bold rounded">[1] Approve and create VDS</button>
-                                                <button className="flex-1 py-3 bg-white/10 hover:bg-white/20 rounded">[2] Regenerate with feedback</button>
-                                                <button className="flex-1 py-3 bg-error hover:bg-red-600 rounded">[3] Discard and abort</button>
+                                                <button onClick={() => sendInput("2")} className="flex-1 py-3 bg-white/10 hover:bg-white/20 rounded">[2] Regenerate with feedback</button>
+                                                <button onClick={() => sendInput("3")} className="flex-1 py-3 bg-error hover:bg-red-600 rounded">[3] Discard and abort</button>
+                                            </div>
+                                        </motion.div>
+                                    )}
+
+                                    {state === 'gate_sql' && (
+                                        <motion.div key="gatecreatevds" initial={{opacity:0, y:10}} animate={{opacity:1, y:0}} exit={{opacity:0, y:-10}}>
+                                            <h3 className="text-white text-lg mb-4 flex items-center gap-2"><Code size={18} className="text-primary"/> Create VDS in Dremio now?</h3>
+                                            <div className="flex gap-4">
+                                                <button onClick={() => sendInput("y")} className="flex-1 py-3 bg-success text-black hover:bg-green-600 font-bold rounded">Yes</button>
+                                                <button onClick={() => sendInput("n")} className="flex-1 py-3 bg-white/10 hover:bg-white/20 rounded">No</button>
                                             </div>
                                         </motion.div>
                                     )}
 
                                     {state === 'gate_autofix' && (
                                         <motion.div key="gateautofix" initial={{opacity:0, y:10}} animate={{opacity:1, y:0}} exit={{opacity:0, y:-10}}>
-                                            <h3 className="text-error font-bold text-lg mb-1 flex items-center gap-2"><AlertCircle size={18}/> Dremio API Validation Failed</h3>
-                                            <p className="text-sm text-gray-400 mb-4">Would you like the Dremio Agent to auto-fix this error?</p>
+                                            <h3 className="text-error font-bold text-lg mb-1 flex items-center gap-2"><AlertCircle size={18}/> Dremio Error Caught</h3>
+                                            <p className="text-sm text-gray-400 mb-4">Would you like the Dremio Agent to attempt auto-fix?</p>
                                             <div className="flex gap-4">
-                                                <button onClick={() => handleAutofix(true)} className="py-3 px-8 bg-warning hover:bg-yellow-500 text-black font-bold rounded shadow-[0_0_15px_rgba(245,158,11,0.3)] flex items-center gap-2"><RefreshCw size={18}/> Yes, Auto-Fix</button>
-                                                <button onClick={() => handleAutofix(false)} className="py-3 px-8 bg-white/10 hover:bg-white/20 font-bold rounded">No, Abort</button>
+                                                <button onClick={() => sendInput("y")} className="py-3 px-8 bg-warning hover:bg-yellow-500 text-black font-bold rounded shadow-[0_0_15px_rgba(245,158,11,0.3)] flex items-center gap-2"><RefreshCw size={18}/> Yes, Auto-Fix</button>
+                                                <button onClick={() => sendInput("n")} className="py-3 px-8 bg-white/10 hover:bg-white/20 font-bold rounded">No, Abort</button>
                                             </div>
                                         </motion.div>
                                     )}
@@ -474,10 +461,16 @@
                                         </motion.div>
                                     )}
                                     
-                                    {(state.startsWith('running_') || state === 'dremio_healing') && (
+                                    {state === 'processing' && (
                                         <motion.div key="running" initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}} className="flex items-center gap-3 text-primary h-full">
                                             <Loader2 size={24} className="animate-spin" />
-                                            <span className="text-lg font-mono tracking-widest uppercase">Executing Background Agents ...</span>
+                                            <span className="text-lg font-mono tracking-widest uppercase">Executing Backend Script ...</span>
+                                        </motion.div>
+                                    )}
+                                    {state === 'connecting' && (
+                                        <motion.div key="connecting" initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}} className="flex items-center gap-3 text-warning h-full">
+                                            <Loader2 size={24} className="animate-spin" />
+                                            <span className="text-lg font-mono tracking-widest uppercase">Connecting to FastAPI WebSocket ...</span>
                                         </motion.div>
                                     )}
                                 </AnimatePresence>
@@ -510,7 +503,7 @@
                                     )
                                 })}
                             </AnimatePresence>
-                            {(state.startsWith('running_') || state === 'dremio_healing') && (
+                            {state === 'processing' && (
                                 <motion.div animate={{ opacity: [1, 0] }} transition={{ repeat: Infinity, duration: 0.8 }} className="w-2 h-4 bg-primary mt-2" />
                             )}
                         </div>
