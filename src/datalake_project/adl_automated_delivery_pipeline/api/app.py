@@ -79,10 +79,6 @@ def get_dashboard():
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
     
-    # Start the LangGraph pipeline in a background thread
-    t = threading.Thread(target=run_pipeline, daemon=True)
-    t.start()
-
     # Async task to continually push logs/prompts to the UI
     async def send_updates():
         while True:
@@ -99,7 +95,14 @@ async def websocket_endpoint(websocket: WebSocket):
         while True:
             # When the UI submits an input response, push it to the input_queue to unblock custom_input()
             data = await websocket.receive_text()
-            input_queue.put(data)
+            
+            if data == "START_WORKFLOW":
+                # Start the LangGraph pipeline in a background thread only on manual trigger
+                t = threading.Thread(target=run_pipeline, daemon=True)
+                t.start()
+                output_queue.put({"type": "log", "message": "Initiating workflow execution..."})
+            else:
+                input_queue.put(data)
     except WebSocketDisconnect:
         sender_task.cancel()
         print("UI disconnected.")
