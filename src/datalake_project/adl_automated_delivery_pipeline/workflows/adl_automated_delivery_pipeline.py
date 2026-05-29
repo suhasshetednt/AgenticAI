@@ -524,7 +524,7 @@ def _build_dremio_prompt(reqs: TicketRequirements) -> str:
 
     return f"""Generate an optimised Dremio SQL query for the following requirement.
 Apply ALL rules from the query rules document before writing any SQL.
-Do NOT add LIMIT — this query will be used as a Virtual Dataset definition.
+Do NOT add LIMIT or ORDER BY — this query will be used as a Virtual Dataset definition.
 Add the VDS comment block at the top.
 
 --- TICKET ---
@@ -607,6 +607,8 @@ def _fix_dremio_sql(sql: str) -> str:
     # tail_number belongs to the MM aircraft table (different source, different join key).
     if re.search(r"amos_postgres\.amos\.", sql, re.IGNORECASE):
         sql = re.sub(r"\b(\w+)\.tail_number\b", r"\1.ac_registr", sql, flags=re.IGNORECASE)
+    # Remove outermost ORDER BY at the end of the query (VDS definitions cannot have ORDER BY)
+    sql = re.sub(r"(?i)\bORDER\s+BY\s+(?:(?!\b(?:WITH|SELECT|FROM|WHERE|GROUP|HAVING|WINDOW|OVER|\)))\b[\s\S])*$", "", sql)
     return sql.strip()
 
 

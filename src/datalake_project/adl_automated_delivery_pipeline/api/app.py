@@ -15,6 +15,23 @@ app = FastAPI()
 input_queue = queue.Queue()
 output_queue = queue.Queue()
 
+class QueueStdout:
+    def __init__(self, queue):
+        self.queue = queue
+        self.buffer = ""
+        self.encoding = "utf-8"
+
+    def write(self, text):
+        self.buffer += text
+        if "\n" in self.buffer:
+            lines = self.buffer.splitlines()
+            for line in lines[:-1]:
+                self.queue.put({"type": "log", "message": line})
+            self.buffer = lines[-1]
+
+    def flush(self):
+        pass
+
 class WebSocketIO:
     """Intercepts built-in print() and input() to route them through WebSockets"""
     def __init__(self):
@@ -39,25 +56,40 @@ class WebSocketIO:
         # Send to UI as a log event
         output_queue.put({"type": "log", "message": msg})
         # Still print to actual console for debugging
-        self.original_print(*args, **kwargs)
+        try:
+            self.original_print(*args, **kwargs)
+        except UnicodeEncodeError:
+            encoding = sys.stdout.encoding or 'utf-8'
+            safe_msg = msg.encode(encoding, errors='replace').decode(encoding)
+            self.original_print(safe_msg, **kwargs)
 
     def custom_input(self, prompt=""):
         # Send the prompt request to the UI
         output_queue.put({"type": "prompt", "message": prompt})
-        self.original_print(prompt, end="", flush=True)
+        try:
+            self.original_print(prompt, end="", flush=True)
+        except UnicodeEncodeError:
+            encoding = sys.stdout.encoding or 'utf-8'
+            safe_prompt = prompt.encode(encoding, errors='replace').decode(encoding)
+            self.original_print(safe_prompt, end="", flush=True)
         # Block the Python thread until the UI sends a response back
         response = input_queue.get()
-        self.original_print(response)
+        try:
+            self.original_print(response)
+        except UnicodeEncodeError:
+            encoding = sys.stdout.encoding or 'utf-8'
+            safe_response = response.encode(encoding, errors='replace').decode(encoding)
+            self.original_print(safe_response)
         return response
 
 ws_io = WebSocketIO()
 
 def run_pipeline():
     """Runs the main pipeline in a separate thread so it doesn't block FastAPI"""
-    project_root = Path(__file__).parent.parent.parent.parent.parent
-    src_dir = project_root / "src"
-    if str(src_dir) not in sys.path:
-        sys.path.insert(0, str(src_dir))
+    # Fix import path to include datalake_project
+    module_dir = Path(__file__).parent.parent.parent # datalake_project dir
+    if str(module_dir) not in sys.path:
+        sys.path.insert(0, str(module_dir))
     
     ws_io.enable()
     try:
