@@ -1,0 +1,67 @@
+{
+  "ticket_id": "ADL-1700",
+  "summary": "[APU Health Monitor] Create query for APU Health Monitor in Engine Folder",
+  "generated_at": "20260530_071152",
+  "source_database": "amos_acceptance",
+  "source_tables": [
+    "amos.rotables",
+    "amos.rotables_trend",
+    "amos.aircraft"
+  ],
+  "output_fields": [
+    {
+      "name": "partno",
+      "description": "APU Part Number"
+    },
+    {
+      "name": "serialno",
+      "description": "APU Serial Number"
+    },
+    {
+      "name": "psn",
+      "description": "Unique PSN associated with each APU Serial Number"
+    },
+    {
+      "name": "ac_registr",
+      "description": "Aircraft Registration"
+    },
+    {
+      "name": "rt_psn",
+      "description": "PSN from rotables_trend table"
+    },
+    {
+      "name": "ref_date",
+      "description": "Reference Date (latest date only for each APU)"
+    },
+    {
+      "name": "trend_type",
+      "description": "Trend Type indicator (CT5)"
+    },
+    {
+      "name": "event_perfno_i",
+      "description": "Workorder number if present"
+    },
+    {
+      "name": "value",
+      "description": "CT5ATP value"
+    },
+    {
+      "name": "ac_typ",
+      "description": "Aircraft Type"
+    }
+  ],
+  "transformations": [
+    "Join rotables table to rotables_trend table on PSN field",
+    "Join rotables table to aircraft table on aircraft registration to obtain aircraft type",
+    "Filter rotables_trend to retain only the latest reference date for each unique PSN/APU combination",
+    "Retain only records where trend_type equals CT5"
+  ],
+  "acceptance_criteria": [
+    "Query returns all APUs fitted to B737NG aircraft in AMOS Acceptance database",
+    "Only the latest reference date is included for each APU",
+    "All required fields are present in output: APU P/n, APU S/n, PSN, Aircraft Reg., Reference Date, CT5, Workorder, CT5ATP value, and Aircraft Type",
+    "VDS is created in Engine Folder",
+    "Query can be switched to AMOS Production when system goes live",
+    "No null values in critical fields (partno, serialno, psn, ac_registr, ac_typ)"
+  ]
+}

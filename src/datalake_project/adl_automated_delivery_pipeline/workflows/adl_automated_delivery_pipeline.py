@@ -1040,6 +1040,54 @@ def _dremio_phase(reqs: TicketRequirements | None) -> str:
                                 space, folder, vds_name = location
                                 approved_vds_path = f"{space}.{folder.replace('/', '.')}.{vds_name}"
                                 # Call tool directly — bypassing the agent gives us the real API error
+                                from adl_automated_delivery_pipeline.tools.dremio_tools import (
+                                    validate_sql_query,
+                                    create_virtual_dataset,
+                                    get_catalog_item,
+                                    create_dremio_folder,
+                                    execute_dremio_sql
+                                )
+                                
+                                # Pre-check if VDS already exists
+                                check_res = get_catalog_item.invoke({"path": approved_vds_path})
+                                if check_res.get("status") == "SUCCESS":
+                                    print(f"\n  A VDS named {vds_name} already exists at {approved_vds_path}.")
+                                    action = _inp("  Do you want to [b]ackup, [d]elete, or [c]ancel? [b/d/c]: ")
+                                    if action.lower() in ("b", "backup"):
+                                        print("  Backing up existing VDS to a backup folder...")
+                                        from datetime import datetime
+                                        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+                                        backup_name = f"{vds_name}_{ts}"
+                                        backup_folder = f"{folder}/backup" if folder else "backup"
+                                        
+                                        print(f"  Ensuring backup folder {space}.{backup_folder.replace('/', '.')} exists...")
+                                        create_dremio_folder(space=space, folder_path=backup_folder)
+                                        
+                                        existing = check_res["item"]
+                                        old_sql = existing.get("sql", "")
+                                        if old_sql:
+                                            res_bak = create_virtual_dataset.invoke({
+                                                "space": space,
+                                                "folder_path": backup_folder,
+                                                "vds_name": backup_name,
+                                                "sql": old_sql
+                                            })
+                                            if res_bak.get("status") == "SUCCESS":
+                                                print(f"  Old VDS successfully copied to backup as {backup_name}.")
+                                                execute_dremio_sql.invoke({"sql": f'DROP VIEW "{space}"."{folder}"."{vds_name}"'})
+                                                print(f"  Old VDS removed from main folder.")
+                                            else:
+                                                print(f"  Failed to create backup copy: {res_bak.get('error')}")
+                                        else:
+                                            print("  Could not read SQL from old VDS.")
+                                    elif action.lower() in ("d", "delete"):
+                                        print("  Deleting existing VDS...")
+                                        execute_dremio_sql.invoke({"sql": f'DROP VIEW "{space}"."{folder}"."{vds_name}"'})
+                                        print("  Old VDS deleted.")
+                                    else:
+                                        print("  VDS creation cancelled.")
+                                        break
+
                                 print(f"\n  Creating VDS at {approved_vds_path} ...")
                                 from adl_automated_delivery_pipeline.tools.dremio_tools import (
                                     validate_sql_query,
@@ -1068,19 +1116,12 @@ def _dremio_phase(reqs: TicketRequirements | None) -> str:
                                     else:
                                         print(f"\n  VDS creation FAILED:")
                                         print(f"  {cres.get('error', cres)}\n")
-                                
-                                autofix = _inp("  Would you like the Dremio Agent to auto-fix this error? [y/n]: ")
-                                if autofix.lower() in ("y", "yes"):
-                                    err_msg = val.get("error") if val.get("status") != "SUCCESS" else cres.get("error")
-                                    sep = "\n" if reqs.extra_notes else ""
-                                    reqs.extra_notes += f"{sep}[Attempt {attempt} API Error]: {err_msg}. Please fix this SQL error."
-                                    print("  Error noted. Regenerating ...\n")
-                                    regenerate = True
-                                    break
-                                else:
-                                    print("  Returning to menu ...\n")
-                                    regenerate = False
-                                    break
+                                        err_msg = cres.get("error")
+                                        sep = "\n" if reqs.extra_notes else ""
+                                        reqs.extra_notes += f"{sep}[Attempt {attempt} API Error]: {err_msg}. Please fix this SQL error."
+                                        print("  Error noted. Regenerating ...\n")
+                                        regenerate = True
+                                        break
                     elif sub == "2":
                         feedback = _inp("Describe what needs to change:\n  > ")
                         sep = "\n" if reqs.extra_notes else ""

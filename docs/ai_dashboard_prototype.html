@@ -32,6 +32,16 @@
         body { background-color: #050505; color: #ededed; overflow: hidden; margin: 0; }
         .glass { background: rgba(17, 17, 17, 0.6); backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.08); }
         .glass-modal { background: rgba(10, 10, 10, 0.85); backdrop-filter: blur(30px); border: 1px solid rgba(255, 255, 255, 0.15); box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5); }
+        .video-bg {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            object-fit: cover;
+            z-index: 0;
+            opacity: 0.6;
+        }
         .grid-bg {
             background-image: 
                 radial-gradient(circle at 50% 0%, rgba(59, 130, 246, 0.15), transparent 40%),
@@ -41,7 +51,6 @@
         }
         .glow-blue { box-shadow: 0 0 20px 0px rgba(59,130,246,0.4); }
         .glow-amber { box-shadow: 0 0 20px 0px rgba(245,158,11,0.4); }
-        
         ::-webkit-scrollbar { width: 6px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 10px; }
@@ -73,11 +82,11 @@
 
         // --- Mock Data & Config ---
         const INITIAL_NODES = [
-            { id: 'jira', label: 'Jira Agent', icon: LayoutDashboard, x: 80, y: 80, status: 'pending', time: '-' },
-            { id: 'doc', label: 'Documentation', icon: FileText, x: 80, y: 240, status: 'pending', time: '-' },
-            { id: 'dremio', label: 'Dremio Agent', icon: Database, x: 80, y: 400, status: 'pending', time: '-' },
-            { id: 'qlik', label: 'Qlik Agent', icon: Activity, x: 360, y: 400, status: 'pending', time: '-' },
-            { id: 'git', label: 'GitHub Agent', icon: GitCommit, x: 360, y: 560, status: 'pending', time: '-' },
+            { id: 'jira', label: 'Jira Agent', icon: 'https://cdn.worldvectorlogo.com/logos/jira-3.svg', x: 250, y: 50, theme: 'from-blue-400 to-blue-600', status: 'pending', time: '-' },
+            { id: 'doc', label: 'Documentation', icon: 'https://cdn-icons-png.flaticon.com/512/3979/3979305.png', x: 250, y: 350, theme: 'from-emerald-400 to-emerald-600', status: 'pending', time: '-' },
+            { id: 'dremio', label: 'Dremio Agent', icon: 'https://www.vectorlogo.zone/logos/dremio/dremio-icon.svg', x: 250, y: 650, theme: 'from-orange-400 to-orange-600', status: 'pending', time: '-' },
+            { id: 'qlik', label: 'Qlik Agent', icon: 'https://images.icon-icons.com/2107/PNG/512/file_type_qlikview_icon_130217.png', x: 650, y: 650, theme: 'from-green-400 to-green-600', status: 'pending', time: '-' },
+            { id: 'git', label: 'GitHub Agent', icon: 'https://cdn.worldvectorlogo.com/logos/github-icon-1.svg', x: 650, y: 950, theme: 'from-purple-400 to-purple-600', status: 'pending', time: '-' },
         ];
 
         const EDGES = [
@@ -95,8 +104,8 @@
         );
 
         const Edge = ({ sourceNode, targetNode, isActive, isCurved }) => {
-            const w = 224;
-            const h = 84;
+            const w = 128;
+            const h = 180;
             
             let startX, startY, endX, endY, path;
 
@@ -138,47 +147,163 @@
             );
         };
 
-        const Node = ({ node, isActive }) => {
-            const Icon = node.icon;
-            let borderClass = 'border-white/10';
-            let bgClass = 'bg-[#111]';
-            let iconColor = 'text-gray-400';
+        const AgentRobot = ({ node, primaryColor }) => {
+            const isRunning = node.status === 'running';
+            const isHealing = node.status === 'healing';
             
-            if (node.status === 'completed') { borderClass = 'border-success/50'; iconColor = 'text-success'; }
-            else if (node.status === 'running') { borderClass = 'border-primary glow-blue'; iconColor = 'text-primary'; }
-            else if (node.status === 'error') { borderClass = 'border-error'; iconColor = 'text-error'; }
-            else if (node.status === 'healing') { borderClass = 'border-warning glow-amber'; iconColor = 'text-warning'; }
-            else if (node.status === 'waiting') { borderClass = 'border-warning/50'; iconColor = 'text-warning'; }
+            return (
+                <div className="relative flex flex-col items-center justify-start w-32 group" style={{ perspective: '800px' }}>
+                    <motion.div 
+                        animate={{ y: [0, -12, 0] }} 
+                        transition={{ duration: 3.5, repeat: Infinity, ease: "easeInOut" }}
+                        className="relative w-24 flex flex-col items-center"
+                        style={{ transformStyle: 'preserve-3d' }}
+                    >
+                        {/* Antenna */}
+                        <div className="w-1 h-4 bg-slate-500 rounded-t-full relative z-0">
+                            <motion.div 
+                                animate={{ opacity: [0.3, 1, 0.3] }} 
+                                transition={{ duration: 1.5, repeat: Infinity }}
+                                className="absolute -top-2 -left-1 w-3 h-3 rounded-full"
+                                style={{ backgroundColor: primaryColor, boxShadow: `0 0 10px ${primaryColor}` }}
+                            />
+                        </div>
+
+                        {/* Head */}
+                        <motion.div 
+                            animate={isRunning ? { rotateY: [-10, 10, -10] } : {}} 
+                            transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+                            className={`w-16 h-12 bg-gradient-to-b ${node.theme || 'from-slate-200 to-slate-400'} rounded-[20px] shadow-[0_5px_15px_rgba(0,0,0,0.5)] flex items-center justify-center z-10 border-b-4 border-black/30 relative`}
+                        >
+                            <div className="w-12 h-5 bg-slate-900 rounded-full flex items-center justify-center overflow-hidden border border-slate-700 shadow-inner">
+                                {isRunning ? (
+                                    <motion.div 
+                                        animate={{ x: [-12, 12, -12] }} 
+                                        transition={{ duration: 1.5, repeat: Infinity, ease: "linear" }}
+                                        className="w-4 h-2 rounded-full"
+                                        style={{ backgroundColor: primaryColor, boxShadow: `0 0 10px ${primaryColor}` }}
+                                    />
+                                ) : isHealing ? (
+                                    <motion.div 
+                                        animate={{ rotate: 360 }} 
+                                        transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+                                        className="w-3 h-3 rounded-full border-2 border-dashed"
+                                        style={{ borderColor: primaryColor }}
+                                    />
+                                ) : (
+                                    <div className="w-6 h-2 flex justify-between">
+                                        <div className="w-2 h-2 rounded-full" style={{ backgroundColor: primaryColor, boxShadow: `0 0 8px ${primaryColor}` }}></div>
+                                        <div className="w-2 h-2 rounded-full" style={{ backgroundColor: primaryColor, boxShadow: `0 0 8px ${primaryColor}` }}></div>
+                                    </div>
+                                )}
+                            </div>
+                        </motion.div>
+
+                        {/* Neck */}
+                        <div className="w-4 h-2 bg-slate-600 z-0"></div>
+
+                        {/* Body / Chest */}
+                        <div className={`w-20 h-20 bg-gradient-to-b ${node.theme || 'from-slate-300 to-slate-500'} rounded-3xl shadow-[0_10px_20px_rgba(0,0,0,0.6)] flex items-center justify-center relative z-20 border-b-4 border-black/30`}>
+                            {/* Chest Screen with Icon */}
+                            <div className="w-12 h-12 bg-slate-900 rounded-full flex items-center justify-center shadow-inner overflow-hidden relative border-2" style={{ borderColor: primaryColor, boxShadow: `inset 0 0 15px ${primaryColor}40` }}>
+                                <img src={node.icon} alt={node.label} className={`w-7 h-7 object-contain drop-shadow-md z-10 ${node.id === 'git' ? 'invert' : ''}`} />
+                                {isRunning && (
+                                    <motion.div animate={{ rotate: 360 }} transition={{ duration: 3, repeat: Infinity, ease: "linear" }} className="absolute inset-0 w-full h-full border-2 border-transparent border-t-white/30 rounded-full" />
+                                )}
+                            </div>
+                            
+                            {/* Arms */}
+                            <motion.div animate={{ y: [0, -3, 0] }} transition={{ duration: 2, repeat: Infinity, delay: 0.2 }} className={`absolute -left-3 top-4 w-4 h-10 bg-gradient-to-b ${node.theme || 'from-slate-300 to-slate-500'} rounded-full shadow-md border-b-2 border-black/30`}></motion.div>
+                            <motion.div animate={{ y: [0, -3, 0] }} transition={{ duration: 2, repeat: Infinity, delay: 0.5 }} className={`absolute -right-3 top-4 w-4 h-10 bg-gradient-to-b ${node.theme || 'from-slate-300 to-slate-500'} rounded-full shadow-md border-b-2 border-black/30`}></motion.div>
+                        </div>
+
+                        {/* Thruster */}
+                        <div className="w-8 h-3 bg-slate-700 rounded-b-xl z-10"></div>
+                        <motion.div 
+                            animate={{ height: isRunning ? [15, 25, 15] : [10, 15, 10], opacity: [0.6, 1, 0.6] }} 
+                            transition={{ duration: 0.2, repeat: Infinity }}
+                            className="w-6 rounded-b-full blur-[3px] -mt-1"
+                            style={{ backgroundColor: primaryColor, backgroundImage: `linear-gradient(to bottom, ${primaryColor}, transparent)` }}
+                        />
+                    </motion.div>
+
+                    {/* Minimal Label */}
+                    <div className="mt-6 flex flex-col items-center z-10">
+                        <span className="font-bold text-[11px] tracking-widest text-white bg-black/60 px-3 py-1 rounded-full border border-white/10 shadow-lg backdrop-blur-md whitespace-nowrap">
+                            {node.label}
+                        </span>
+                        <span className="text-[9px] uppercase font-bold tracking-widest mt-1 px-2 py-0.5 rounded bg-black/40 whitespace-nowrap" style={{ color: primaryColor }}>
+                            {node.status} {node.time && node.time !== '-' && `(${node.time})`}
+                        </span>
+                    </div>
+                </div>
+            );
+        };
+
+        const JetEngineButton = ({ onClick, disabled, isSpinning }) => {
+            return (
+                <div className="flex flex-col items-center justify-center w-full my-8">
+                    <motion.button 
+                        onClick={onClick} 
+                        disabled={disabled}
+                        className={`relative w-64 h-64 flex items-center justify-center outline-none transition-all duration-500 rounded-full overflow-hidden border-[10px] border-slate-900
+                            ${disabled && !isSpinning ? 'opacity-50 cursor-not-allowed grayscale' : 'hover:scale-105 cursor-pointer drop-shadow-[0_20px_40px_rgba(245,158,11,0.5)]'}
+                        `}
+                        animate={isSpinning ? { x: [-2, 2, -2, 2, 0], y: [-2, 2, -2, 2, 0] } : {}}
+                        transition={isSpinning ? { duration: 0.1, repeat: Infinity } : {}}
+                    >
+                        {/* The realistic engine photo uploaded by user */}
+                        <div 
+                            className={`absolute inset-0 bg-cover bg-no-repeat transition-all duration-[2s] ${isSpinning ? 'scale-110' : 'scale-100'}`}
+                            style={{ 
+                                backgroundImage: isSpinning ? "url('./image/engine_animated.png')" : "url('./image/engine.png')",
+                                backgroundPosition: "45% 55%", // Focus on the engine core
+                                backgroundSize: "180%"
+                            }}
+                        ></div>
+
+                        {/* Intense Heat Distortion / Glow overlay when running */}
+                        {isSpinning && (
+                            <motion.div 
+                                className="absolute inset-0 bg-orange-500/10 mix-blend-color-burn pointer-events-none"
+                                animate={{ opacity: [0.1, 0.4, 0.1] }}
+                                transition={{ duration: 0.1, repeat: Infinity }}
+                            />
+                        )}
+
+                        {/* Flat UI Overlay for Button Text */}
+                        {!isSpinning && (
+                            <div className="absolute inset-0 flex items-center justify-center z-40 bg-black/50 rounded-full backdrop-blur-[2px] group hover:bg-transparent transition-all duration-300 transform-gpu">
+                                <span className="text-white font-bold text-sm tracking-widest uppercase drop-shadow-[0_2px_4px_rgba(0,0,0,1)] group-hover:opacity-0 transition-opacity">
+                                    Ignite<br/>Afterburner
+                                </span>
+                            </div>
+                        )}
+                    </motion.button>
+                    <div className="mt-12 text-center">
+                        <span className={`text-[12px] font-bold uppercase tracking-widest ${isSpinning ? 'text-orange-500 animate-pulse drop-shadow-[0_0_5px_rgba(249,115,22,0.8)]' : 'text-gray-500'}`}>
+                            {isSpinning ? 'Afterburner Engaged - Pipeline Running' : 'Turbine Standby'}
+                        </span>
+                    </div>
+                </div>
+            );
+        };
+
+        const Node = ({ node, isActive }) => {
+            let primaryColor = '#3B82F6';
+            if (node.status === 'completed') primaryColor = '#10B981';
+            if (node.status === 'error') primaryColor = '#EF4444';
+            if (node.status === 'healing') primaryColor = '#F59E0B';
+            if (node.status === 'waiting' || node.status === 'pending') primaryColor = '#6B7280';
 
             return (
                 <motion.div 
-                    className={`absolute glass rounded-xl p-4 w-56 border flex flex-col gap-3 transition-colors duration-300 ${borderClass} ${bgClass}`}
+                    className="absolute flex flex-col items-center justify-start cursor-pointer w-32 h-[180px]"
                     style={{ left: node.x, top: node.y, zIndex: 10 }}
                     initial={{ opacity: 0, scale: 0.9 }}
                     animate={{ opacity: 1, scale: 1 }}
                 >
-                    <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                            <Icon size={18} className={iconColor} />
-                            <span className="font-semibold text-sm">{node.label}</span>
-                        </div>
-                        {node.status === 'completed' && <CheckCircle2 size={16} className="text-success" />}
-                        {node.status === 'running' && <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 2, ease: "linear" }}><Loader2 size={16} className="text-primary" /></motion.div>}
-                        {node.status === 'healing' && <motion.div animate={{ rotate: -360 }} transition={{ repeat: Infinity, duration: 3, ease: "linear" }}><RefreshCw size={16} className="text-warning" /></motion.div>}
-                        {node.status === 'error' && <AlertCircle size={16} className="text-error" />}
-                        {node.status === 'waiting' && <motion.div animate={{ scale: [1, 1.2, 1] }} transition={{ repeat: Infinity, duration: 1.5 }}><MessageSquare size={16} className="text-warning" /></motion.div>}
-                        {node.status === 'pending' && <Clock size={16} className="text-gray-600" />}
-                    </div>
-                    
-                    <div className="flex justify-between items-end text-[10px] text-gray-400 font-mono mt-1">
-                        <span className="bg-black/30 px-2 py-1 rounded truncate max-w-[120px]">
-                            {node.status === 'running' ? 'processing...' : 
-                             node.status === 'healing' ? 'auto-fixing...' :
-                             node.status === 'waiting' ? 'user input req...' :
-                             node.status.toUpperCase()}
-                        </span>
-                        <span>{node.time}</span>
-                    </div>
+                    <AgentRobot node={node} primaryColor={primaryColor} />
                 </motion.div>
             );
         };
@@ -217,7 +342,6 @@
             useEffect(() => {
                 ws.current = new WebSocket('ws://localhost:8000/ws');
                 ws.current.onopen = () => {
-                    addLog('Connected to Orchestration Backend.', 'success');
                     setState('ready_to_start');
                 };
                 ws.current.onmessage = (event) => {
@@ -307,27 +431,34 @@
             };
 
             return (
-                <div className="flex h-screen w-screen font-sans bg-background text-white overflow-hidden">
+                <div className="flex h-screen w-screen font-sans text-white overflow-hidden relative bg-black">
+                    <video autoPlay loop muted playsInline className="video-bg">
+                        <source src="/image/asl_airlines_edited.mp4" type="video/mp4" />
+                    </video>
                     
                     {/* Left Canvas Area */}
-                    <div className="flex-1 relative grid-bg flex flex-col">
+                    <div className="flex-1 relative grid-bg flex flex-col z-10 bg-black/40">
                         {/* Header */}
                         <div className="h-14 glass flex items-center px-6 justify-between border-b border-white/10 z-20">
                             <div className="flex items-center gap-4">
-                                <Network className="text-primary" size={20} />
-                                <h1 className="font-semibold tracking-wide">ADL Workflow Orchestrator</h1>
+                                <img src="https://aslairlines.be/wp-content/uploads/2022/09/asl_belgium_white_logo.png" alt="ASL Airlines" className="h-6 object-contain drop-shadow-md" />
+                                <h1 className="font-semibold tracking-wide">DataLake Workflow Orchestrator</h1>
                             </div>
                             <div className="flex items-center gap-4">
-                                {state === 'connecting' && <span className="text-warning text-xs flex items-center gap-2"><Loader2 className="animate-spin" size={14}/> Connecting...</span>}
-                                {state === 'disconnected' && <span className="text-error text-xs flex items-center gap-2"><AlertCircle size={14}/> Offline</span>}
+                                <div className="flex gap-1.5 items-center mr-2">
+                                    <div className={`w-3 h-3 rounded-full transition-all duration-300 ${state === 'disconnected' ? 'bg-red-500 shadow-[0_0_10px_red]' : 'bg-red-900/50'}`} title="Offline"></div>
+                                    <div className={`w-3 h-3 rounded-full transition-all duration-300 ${state === 'connecting' ? 'bg-amber-500 shadow-[0_0_10px_orange]' : 'bg-amber-900/50'}`} title="Connecting"></div>
+                                    <div className={`w-3 h-3 rounded-full transition-all duration-300 ${['ready_to_start', 'processing'].includes(state) ? 'bg-green-500 shadow-[0_0_10px_lime]' : 'bg-green-900/50'}`} title="Connected"></div>
+                                </div>
                                 <button onClick={() => window.location.reload()} className="hover:text-white text-gray-400 transition-colors flex items-center gap-2 text-sm bg-white/5 px-3 py-1.5 rounded border border-white/10">
                                     <RefreshCw size={14} /> Restart
                                 </button>
                             </div>
                         </div>
-
-                        {/* Nodes Area (3D Graph) */}
-                        <div className="flex-1 relative overflow-hidden">
+                        
+                        {/* Nodes Area */}
+                        <div className="flex-1 relative overflow-auto flex items-start justify-center">
+                            <div className="relative min-w-[1000px] min-h-[1200px] p-10">
                             {/* Draw Edges */}
                             {EDGES.map((edge, i) => {
                                 const source = nodes.find(n => n.id === edge.source);
@@ -358,11 +489,13 @@
 
                             {/* Draw Nodes */}
                             {nodes.map(node => <Node key={node.id} node={node} />)}
+                            </div>
                         </div>
+                    </div>
 
-                        {/* Bottom Interactive Terminal Console */}
-                        <div className="h-[40vh] glass border-t border-white/10 z-20 flex flex-col bg-black/80 shadow-[0_-20px_50px_rgba(0,0,0,0.5)] relative font-mono text-sm">
-                            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-primary/30 to-transparent"></div>
+                    {/* Right-Side Interactive Terminal Console */}
+                    <div className="w-[500px] xl:w-[600px] glass border-l border-white/10 z-20 flex flex-col bg-black/80 shadow-[-20px_0_50px_rgba(0,0,0,0.5)] relative font-mono text-sm shrink-0">
+                        <div className="absolute top-0 left-0 w-1 h-full bg-gradient-to-b from-transparent via-primary/30 to-transparent"></div>
                             
                             <div className="h-8 border-b border-white/10 flex items-center px-4 bg-white/5 text-gray-400 text-xs gap-2">
                                 <Terminal size={14}/> <span>Pipeline Interactive Console</span>
@@ -375,21 +508,16 @@
                                     </div>
                                 ))}
                                 
-                                {state === 'ready_to_start' && (
-                                    <div className="flex flex-col items-center justify-center mt-10">
-                                        <button 
-                                            onClick={() => {
-                                                ws.current.send("START_WORKFLOW");
-                                                setState("processing");
-                                            }}
-                                            className="bg-primary hover:bg-blue-500 text-white px-8 py-4 rounded font-bold tracking-widest uppercase flex items-center gap-3 transition-all shadow-[0_0_20px_rgba(59,130,246,0.5)] hover:scale-105"
-                                        >
-                                            <Play fill="currentColor" size={20}/>
-                                            Start Pipeline Execution
-                                        </button>
-                                        <p className="text-gray-500 mt-4 text-xs">This will execute adl_automated_delivery_pipeline.py on the backend.</p>
-                                    </div>
-                                )}
+                                <JetEngineButton 
+                                    onClick={() => {
+                                        if (state === 'ready_to_start') {
+                                            ws.current.send("START_WORKFLOW");
+                                            setState("processing");
+                                        }
+                                    }}
+                                    disabled={state !== 'ready_to_start'}
+                                    isSpinning={['processing', 'waiting_input'].includes(state)}
+                                />
 
                                 {activePrompt && (
                                     <div className="mt-2 text-primary font-bold flex items-center bg-primary/10 p-2 rounded border border-primary/20">
@@ -406,36 +534,7 @@
                                         <div className="w-2 h-4 bg-primary animate-pulse ml-1" />
                                     </div>
                                 )}
-                                <div ref={terminalEndRef} />
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Right Sidebar - System Logs */}
-                    <div className="w-80 glass border-l border-white/10 z-20 flex flex-col hidden lg:flex">
-                        <div className="h-14 flex items-center px-4 border-b border-white/10 gap-2">
-                            <Activity size={18} className="text-gray-400"/>
-                            <span className="font-semibold text-sm">WebSocket Sync</span>
-                        </div>
-                        <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-3 font-mono text-[10px]">
-                            <AnimatePresence>
-                                {logs.map((log, i) => {
-                                    let color = 'text-gray-400', border = 'border-gray-800', bg = 'bg-black/40';
-                                    if (log.type === 'success') { color = 'text-success'; border = 'border-success/30'; }
-                                    if (log.type === 'error') { color = 'text-error'; border = 'border-error/50'; bg = 'bg-error/10'; }
-                                    if (log.type === 'warning') { color = 'text-warning'; border = 'border-warning/50'; bg = 'bg-warning/10'; }
-                                    if (log.type === 'info') { color = 'text-primary'; border = 'border-primary/30'; }
-                                    return (
-                                        <motion.div key={i} initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className={`p-2 ${bg} rounded border-l-2 ${border} flex flex-col gap-1 shadow-sm`}>
-                                            <div className="flex justify-between text-gray-500">
-                                                <span>{log.source}</span>
-                                                <span>{log.time}</span>
-                                            </div>
-                                            <div className={`${color} leading-snug`}>{log.msg}</div>
-                                        </motion.div>
-                                    )
-                                })}
-                            </AnimatePresence>
+                            <div ref={terminalEndRef} />
                         </div>
                     </div>
                 </div>

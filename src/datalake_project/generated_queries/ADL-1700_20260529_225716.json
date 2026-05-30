@@ -1,0 +1,63 @@
+{
+  "ticket_id": "ADL-1700",
+  "summary": "[APU Health Monitor] Create query for APU Health Monitor in Engine Folder",
+  "generated_at": "20260529_225716",
+  "source_database": "amos_acceptance",
+  "source_tables": [
+    "amos.rotables",
+    "amos.rotables_trend",
+    "amos.aircraft"
+  ],
+  "output_fields": [
+    {
+      "name": "partno",
+      "description": "APU Part Number"
+    },
+    {
+      "name": "serialno",
+      "description": "APU Serial Number"
+    },
+    {
+      "name": "psn",
+      "description": "Unique PSN associated with each APU Serial Number"
+    },
+    {
+      "name": "ac_registr",
+      "description": "Aircraft Registration"
+    },
+    {
+      "name": "ref_date",
+      "description": "Reference Date (latest date only for each APU)"
+    },
+    {
+      "name": "trend_type",
+      "description": "CT5 trend type indicator"
+    },
+    {
+      "name": "event_perfno_i",
+      "description": "Workorder number if present"
+    },
+    {
+      "name": "value",
+      "description": "CT5ATP value representing APU health metric"
+    },
+    {
+      "name": "ac_typ",
+      "description": "Aircraft Type"
+    }
+  ],
+  "transformations": [
+    "Join rotables table with rotables_trend table on psn field",
+    "Join result with aircraft table on ac_registr field to obtain ac_typ",
+    "Filter rotables_trend to include only the latest ref_date for each unique PSN",
+    "Ensure trend_type equals CT5 for all records"
+  ],
+  "acceptance_criteria": [
+    "Query returns all APUs of type B737NG with their latest CT5ATP health metrics",
+    "Only the most recent reference date is included for each APU",
+    "All required fields (partno, serialno, psn, ac_registr, ref_date, trend_type, event_perfno_i, value, ac_typ) are present in output",
+    "Query executes against AMOS Acceptance environment initially, with capability to switch to AMOS Production upon go-live",
+    "VDS is created in Engine Folder as specified",
+    "Workorder information is included when present, null when absent"
+  ]
+}
