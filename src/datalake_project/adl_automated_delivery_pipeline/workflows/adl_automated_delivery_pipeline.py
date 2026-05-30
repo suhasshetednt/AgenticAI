@@ -1100,6 +1100,10 @@ def _dremio_phase(reqs: TicketRequirements | None) -> str:
                                 val = validate_sql_query.invoke({"sql": sql})
                                 if val.get("status") != "SUCCESS":
                                     print(f"\n  Validation FAILED: {val.get('error', val)}\n")
+                                    print("  [1] Approve and save to file")
+                                    print("  [2] Regenerate with feedback")
+                                    print("  [3] Discard and return to menu")
+                                    print(_DIV)
                                 else:
                                     print("  SQL validated OK. Creating VDS ...")
                                     cres = create_virtual_dataset.invoke({
