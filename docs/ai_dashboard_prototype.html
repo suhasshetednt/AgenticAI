@@ -94,7 +94,8 @@
             { source: 'doc', target: 'dremio' },
             { source: 'dremio', target: 'qlik' },
             { source: 'qlik', target: 'git' },
-            { source: 'qlik', target: 'jira', isCurved: true }
+            { source: 'qlik', target: 'jira', isCurved: true },
+            { source: 'jira', target: 'qlik', isCurvedReverse: true }
         ];
 
         const Loader2 = (props) => (
@@ -103,7 +104,7 @@
             </svg>
         );
 
-        const Edge = ({ sourceNode, targetNode, isActive, isCurved }) => {
+        const Edge = ({ sourceNode, targetNode, isActive, isCurved, isCurvedReverse }) => {
             const w = 128;
             const h = 180;
             
@@ -116,6 +117,13 @@
                 endX = targetNode.x + w;
                 endY = targetNode.y + h/2;
                 path = `M ${startX} ${startY} C ${startX + 150} ${startY}, ${endX + 200} ${endY}, ${endX} ${endY}`;
+            } else if (isCurvedReverse) {
+                // Reverse curve from Jira back to Qlik
+                startX = sourceNode.x + w;
+                startY = sourceNode.y + h/2;
+                endX = targetNode.x + w;
+                endY = targetNode.y + h/2;
+                path = `M ${startX} ${startY} C ${startX + 200} ${startY}, ${endX + 150} ${endY}, ${endX} ${endY}`;
             } else {
                 if (Math.abs(sourceNode.y - targetNode.y) < 10) {
                     // Same row (e.g. Dremio -> Qlik)
@@ -139,9 +147,10 @@
                 <svg className="absolute inset-0 pointer-events-none w-full h-full" style={{ zIndex: 0 }}>
                     <path d={path} stroke="rgba(255,255,255,0.15)" strokeWidth="2" fill="none" />
                     {isActive && (
-                        <circle r="5" fill="#3B82F6" style={{ filter: 'drop-shadow(0 0 8px #3B82F6)' }}>
-                            <animateMotion dur="1.5s" repeatCount="indefinite" path={path} />
-                        </circle>
+                        <g style={{ filter: 'drop-shadow(0 0 8px #3B82F6)' }}>
+                            <animateMotion dur="1.5s" repeatCount="indefinite" path={path} rotate="auto" />
+                            <path d="M12,0 L4,-6 L2,-6 L4,-1 L-6,-1 L-9,-4 L-12,-4 L-9,0 L-12,4 L-9,4 L-6,1 L4,1 L2,6 L4,6 Z" fill="#3B82F6" stroke="white" strokeWidth="1" />
+                        </g>
                     )}
                 </svg>
             );
@@ -469,9 +478,10 @@
                                 const lastLog = terminalOutput[terminalOutput.length - 1] || '';
                                 if (source.id === 'jira' && target.id === 'doc' && (lastLog.includes('TICKET REQUIREMENTS') || lastLog.includes('Proceed to Documentation'))) isActive = true;
                                 if (source.id === 'doc' && target.id === 'dremio' && (lastLog.includes('Document saved') || lastLog.includes('Proceed to Dremio'))) isActive = true;
-                                if (source.id === 'dremio' && target.id === 'qlik' && (lastLog.includes('VDS created') || lastLog.includes('Build QlikSense'))) isActive = true;
-                                if (source.id === 'qlik' && target.id === 'git' && lastLog.includes('Codebase modified')) isActive = true;
-                                if (source.id === 'qlik' && target.id === 'jira' && lastLog.includes('separate JIRA ticket for Qlik?')) isActive = true;
+                                if (source.id === 'dremio' && target.id === 'qlik' && (lastLog.includes('VDS created') || lastLog.includes('Build QlikSense') || lastLog.includes('Jira Agent analyzing ticket') || lastLog.includes('VDS path') || lastLog.includes('App name'))) isActive = true;
+                                if (source.id === 'qlik' && target.id === 'git' && (lastLog.includes('Codebase modified') || lastLog.includes('Validating local codebase'))) isActive = true;
+                                if (source.id === 'qlik' && target.id === 'jira' && (lastLog.includes('separate JIRA ticket for Qlik?') || lastLog.includes('Select option') || lastLog.includes('Loading sprints') || lastLog.includes('Select sprint number') || lastLog.includes('Select assignee number') || lastLog.includes('Select ticket number'))) isActive = true;
+                                if (source.id === 'jira' && target.id === 'qlik' && (lastLog.includes('Jira Agent analyzing ticket') || lastLog.includes('VDS path') || lastLog.includes('App name') || lastLog.includes('Qlik space') || lastLog.includes('Ready to build dashboard') || lastLog.includes('Proceed with Qlik dashboard creation?'))) isActive = true;
 
                                 // Fallback generic flow
                                 if (source.status === 'completed' && (target.status === 'running' || target.status === 'healing')) isActive = true;
@@ -483,6 +493,7 @@
                                         targetNode={target}
                                         isActive={isActive}
                                         isCurved={edge.isCurved}
+                                        isCurvedReverse={edge.isCurvedReverse}
                                     />
                                 );
                             })}
