@@ -263,9 +263,9 @@
                     >
                         {/* The realistic engine photo uploaded by user */}
                         <div 
-                            className={`absolute inset-0 bg-cover bg-no-repeat transition-all duration-[2s] ${isSpinning ? 'scale-110' : 'scale-100'}`}
+                            className={`absolute inset-0 bg-cover bg-no-repeat transition-all duration-[2s] ${isSpinning ? 'scale-110 animate-[spin_0.5s_linear_infinite]' : 'scale-100'}`}
                             style={{ 
-                                backgroundImage: isSpinning ? "url('./image/engine_animated.png')" : "url('./image/engine.png')",
+                                backgroundImage: isSpinning ? "url('./images/engine_animated.png')" : "url('./images/engine.png')",
                                 backgroundPosition: "45% 55%", // Focus on the engine core
                                 backgroundSize: "180%"
                             }}
