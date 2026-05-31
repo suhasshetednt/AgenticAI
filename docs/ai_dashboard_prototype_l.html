@@ -1,0 +1,564 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive AI Ops Control Center</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    animation: {
+                        'spin-fast': 'spin 0.5s linear infinite',
+                    },
+                    colors: {
+                        background: '#050505',
+                        surface: 'rgba(17, 17, 17, 0.7)',
+                        primary: '#3B82F6',
+                        success: '#10B981',
+                        warning: '#F59E0B',
+                        error: '#EF4444',
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    }
+                }
+            }
+        }
+    </script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <style>
+        body { background-color: #050505; color: #ededed; overflow: hidden; margin: 0; }
+        .glass { background: rgba(17, 17, 17, 0.6); backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.08); }
+        .glass-modal { background: rgba(10, 10, 10, 0.85); backdrop-filter: blur(30px); border: 1px solid rgba(255, 255, 255, 0.15); box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5); }
+        .video-bg {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            z-index: 0;
+            opacity: 0.15;
+        }
+        .grid-bg {
+            background-image: 
+                radial-gradient(circle at 50% 0%, rgba(59, 130, 246, 0.15), transparent 40%),
+                linear-gradient(to right, rgba(255,255,255,0.03) 1px, transparent 1px),
+                linear-gradient(to bottom, rgba(255,255,255,0.03) 1px, transparent 1px);
+            background-size: 100% 100%, 40px 40px, 40px 40px;
+        }
+        .glow-blue { box-shadow: 0 0 20px 0px rgba(59,130,246,0.4); }
+        .glow-amber { box-shadow: 0 0 20px 0px rgba(245,158,11,0.4); }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.2); }
+        
+        /* Custom Select */
+        select { appearance: none; background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e"); background-repeat: no-repeat; background-position: right 1rem center; background-size: 1em; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="importmap">
+    {
+        "imports": {
+            "react": "https://esm.sh/react@18.2.0",
+            "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
+            "framer-motion": "https://esm.sh/framer-motion@10.16.4?deps=react@18.2.0,react-dom@18.2.0",
+            "lucide-react": "https://esm.sh/lucide-react@0.292.0?deps=react@18.2.0"
+        }
+    }
+    </script>
+    
+    <script type="text/babel" data-type="module">
+        import React, { useState, useEffect, useRef } from 'react';
+        import { createRoot } from 'react-dom/client';
+        import { motion, AnimatePresence } from 'framer-motion';
+        import { Terminal, Activity, GitCommit, Database, FileText, CheckCircle2, Clock, LayoutDashboard, Cpu, Network, AlertCircle, RefreshCw, Layers, MessageSquare, Check, X, Code, Users, Play } from 'lucide-react';
+
+        // --- Mock Data & Config ---
+        const INITIAL_NODES = [
+            { id: 'jira', label: 'Jira Agent', icon: 'https://cdn.worldvectorlogo.com/logos/jira-3.svg', x: 250, y: 50, theme: 'from-blue-400 to-blue-600', status: 'pending', time: '-' },
+            { id: 'doc', label: 'Documentation', icon: 'https://cdn-icons-png.flaticon.com/512/3979/3979305.png', x: 250, y: 350, theme: 'from-emerald-400 to-emerald-600', status: 'pending', time: '-' },
+            { id: 'dremio', label: 'Dremio Agent', icon: 'https://www.vectorlogo.zone/logos/dremio/dremio-icon.svg', x: 250, y: 650, theme: 'from-orange-400 to-orange-600', status: 'pending', time: '-' },
+            { id: 'qlik', label: 'Qlik Agent', icon: 'https://images.icon-icons.com/2107/PNG/512/file_type_qlikview_icon_130217.png', x: 650, y: 650, theme: 'from-green-400 to-green-600', status: 'pending', time: '-' },
+            { id: 'git', label: 'GitHub Agent', icon: 'https://cdn.worldvectorlogo.com/logos/github-icon-1.svg', x: 650, y: 950, theme: 'from-purple-400 to-purple-600', status: 'pending', time: '-' },
+        ];
+
+        const EDGES = [
+            { source: 'jira', target: 'doc' },
+            { source: 'doc', target: 'dremio' },
+            { source: 'dremio', target: 'qlik' },
+            { source: 'qlik', target: 'git' },
+            { source: 'qlik', target: 'jira', isCurved: true },
+            { source: 'jira', target: 'qlik', isCurvedReverse: true }
+        ];
+
+        const Loader2 = (props) => (
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+                <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
+            </svg>
+        );
+
+        const Edge = ({ sourceNode, targetNode, isActive, isCurved, isCurvedReverse }) => {
+            const w = 128;
+            const h = 180;
+            
+            let startX, startY, endX, endY, path;
+
+            if (isCurved) {
+                // Draw a nice bezier curve from Qlik back to Jira
+                startX = sourceNode.x + w; 
+                startY = sourceNode.y + h/2;
+                endX = targetNode.x + w;
+                endY = targetNode.y + h/2;
+                path = `M ${startX} ${startY} C ${startX + 150} ${startY}, ${endX + 200} ${endY}, ${endX} ${endY}`;
+            } else if (isCurvedReverse) {
+                // Reverse curve from Jira back to Qlik
+                startX = sourceNode.x + w;
+                startY = sourceNode.y + h/2;
+                endX = targetNode.x + w;
+                endY = targetNode.y + h/2;
+                path = `M ${startX} ${startY} C ${startX + 200} ${startY}, ${endX + 150} ${endY}, ${endX} ${endY}`;
+            } else {
+                if (Math.abs(sourceNode.y - targetNode.y) < 10) {
+                    // Same row (e.g. Dremio -> Qlik)
+                    startX = sourceNode.x + w;
+                    startY = sourceNode.y + h/2;
+                    endX = targetNode.x;
+                    endY = targetNode.y + h/2;
+                    path = `M ${startX} ${startY} L ${endX} ${endY}`;
+                } else {
+                    // Vertical flow (e.g. Jira -> Doc)
+                    startX = sourceNode.x + w/2;
+                    startY = sourceNode.y + h;
+                    endX = targetNode.x + w/2;
+                    endY = targetNode.y;
+                    
+                    const midY = startY + (endY - startY) / 2;
+                    path = `M ${startX} ${startY} L ${startX} ${midY} L ${endX} ${midY} L ${endX} ${endY}`;
+                }
+            }
+            return (
+                <svg className="absolute inset-0 pointer-events-none w-full h-full" style={{ zIndex: 0 }}>
+                    <path d={path} stroke="rgba(255,255,255,0.15)" strokeWidth="2" fill="none" />
+                    {isActive && (
+                        <g style={{ filter: 'drop-shadow(0 0 8px #3B82F6)' }}>
+                            <animateMotion dur="1.5s" repeatCount="indefinite" path={path} rotate="auto" />
+                            <path d="M12,0 L4,-6 L2,-6 L4,-1 L-6,-1 L-9,-4 L-12,-4 L-9,0 L-12,4 L-9,4 L-6,1 L4,1 L2,6 L4,6 Z" fill="#3B82F6" stroke="white" strokeWidth="1" />
+                        </g>
+                    )}
+                </svg>
+            );
+        };
+
+        const AgentRobot = ({ node, primaryColor }) => {
+            const isRunning = node.status === 'running';
+            const isHealing = node.status === 'healing';
+            
+            return (
+                <div className="relative flex flex-col items-center justify-start w-32 group" style={{ perspective: '800px' }}>
+                    <motion.div 
+                        animate={{ y: [0, -12, 0] }} 
+                        transition={{ duration: 3.5, repeat: Infinity, ease: "easeInOut" }}
+                        className="relative w-24 flex flex-col items-center"
+                        style={{ transformStyle: 'preserve-3d' }}
+                    >
+                        {/* Antenna */}
+                        <div className="w-1 h-4 bg-slate-500 rounded-t-full relative z-0">
+                            <motion.div 
+                                animate={{ opacity: [0.3, 1, 0.3] }} 
+                                transition={{ duration: 1.5, repeat: Infinity }}
+                                className="absolute -top-2 -left-1 w-3 h-3 rounded-full"
+                                style={{ backgroundColor: primaryColor, boxShadow: `0 0 10px ${primaryColor}` }}
+                            />
+                        </div>
+
+                        {/* Head */}
+                        <motion.div 
+                            animate={isRunning ? { rotateY: [-10, 10, -10] } : {}} 
+                            transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+                            className={`w-16 h-12 bg-gradient-to-b ${node.theme || 'from-slate-200 to-slate-400'} rounded-[20px] shadow-[0_5px_15px_rgba(0,0,0,0.5)] flex items-center justify-center z-10 border-b-4 border-black/30 relative`}
+                        >
+                            <div className="w-12 h-5 bg-slate-900 rounded-full flex items-center justify-center overflow-hidden border border-slate-700 shadow-inner">
+                                {isRunning ? (
+                                    <motion.div 
+                                        animate={{ x: [-12, 12, -12] }} 
+                                        transition={{ duration: 1.5, repeat: Infinity, ease: "linear" }}
+                                        className="w-4 h-2 rounded-full"
+                                        style={{ backgroundColor: primaryColor, boxShadow: `0 0 10px ${primaryColor}` }}
+                                    />
+                                ) : isHealing ? (
+                                    <motion.div 
+                                        animate={{ rotate: 360 }} 
+                                        transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+                                        className="w-3 h-3 rounded-full border-2 border-dashed"
+                                        style={{ borderColor: primaryColor }}
+                                    />
+                                ) : (
+                                    <div className="w-6 h-2 flex justify-between">
+                                        <div className="w-2 h-2 rounded-full" style={{ backgroundColor: primaryColor, boxShadow: `0 0 8px ${primaryColor}` }}></div>
+                                        <div className="w-2 h-2 rounded-full" style={{ backgroundColor: primaryColor, boxShadow: `0 0 8px ${primaryColor}` }}></div>
+                                    </div>
+                                )}
+                            </div>
+                        </motion.div>
+
+                        {/* Neck */}
+                        <div className="w-4 h-2 bg-slate-600 z-0"></div>
+
+                        {/* Body / Chest */}
+                        <div className={`w-20 h-20 bg-gradient-to-b ${node.theme || 'from-slate-300 to-slate-500'} rounded-3xl shadow-[0_10px_20px_rgba(0,0,0,0.6)] flex items-center justify-center relative z-20 border-b-4 border-black/30`}>
+                            {/* Chest Screen with Icon */}
+                            <div className="w-12 h-12 bg-slate-900 rounded-full flex items-center justify-center shadow-inner overflow-hidden relative border-2" style={{ borderColor: primaryColor, boxShadow: `inset 0 0 15px ${primaryColor}40` }}>
+                                <img src={node.icon} alt={node.label} className={`w-7 h-7 object-contain drop-shadow-md z-10 ${node.id === 'git' ? 'invert' : ''}`} />
+                                {isRunning && (
+                                    <motion.div animate={{ rotate: 360 }} transition={{ duration: 3, repeat: Infinity, ease: "linear" }} className="absolute inset-0 w-full h-full border-2 border-transparent border-t-white/30 rounded-full" />
+                                )}
+                            </div>
+                            
+                            {/* Arms */}
+                            <motion.div animate={{ y: [0, -3, 0] }} transition={{ duration: 2, repeat: Infinity, delay: 0.2 }} className={`absolute -left-3 top-4 w-4 h-10 bg-gradient-to-b ${node.theme || 'from-slate-300 to-slate-500'} rounded-full shadow-md border-b-2 border-black/30`}></motion.div>
+                            <motion.div animate={{ y: [0, -3, 0] }} transition={{ duration: 2, repeat: Infinity, delay: 0.5 }} className={`absolute -right-3 top-4 w-4 h-10 bg-gradient-to-b ${node.theme || 'from-slate-300 to-slate-500'} rounded-full shadow-md border-b-2 border-black/30`}></motion.div>
+                        </div>
+
+                        {/* Thruster */}
+                        <div className="w-8 h-3 bg-slate-700 rounded-b-xl z-10"></div>
+                        <motion.div 
+                            animate={{ height: isRunning ? [15, 25, 15] : [10, 15, 10], opacity: [0.6, 1, 0.6] }} 
+                            transition={{ duration: 0.2, repeat: Infinity }}
+                            className="w-6 rounded-b-full blur-[3px] -mt-1"
+                            style={{ backgroundColor: primaryColor, backgroundImage: `linear-gradient(to bottom, ${primaryColor}, transparent)` }}
+                        />
+                    </motion.div>
+
+                    {/* Minimal Label */}
+                    <div className="mt-6 flex flex-col items-center z-10">
+                        <span className="font-bold text-[11px] tracking-widest text-white bg-black/60 px-3 py-1 rounded-full border border-white/10 shadow-lg backdrop-blur-md whitespace-nowrap">
+                            {node.label}
+                        </span>
+                        <span className="text-[9px] uppercase font-bold tracking-widest mt-1 px-2 py-0.5 rounded bg-black/40 whitespace-nowrap" style={{ color: primaryColor }}>
+                            {node.status} {node.time && node.time !== '-' && `(${node.time})`}
+                        </span>
+                    </div>
+                </div>
+            );
+        };
+
+        const JetEngineButton = ({ onClick, disabled, isSpinning }) => {
+            return (
+                <div className="flex flex-col items-center justify-center w-full py-8 bg-gradient-to-b from-black to-transparent">
+                    <motion.button 
+                        onClick={onClick} 
+                        disabled={disabled}
+                        className={`relative w-64 h-64 flex items-center justify-center outline-none transition-all duration-500 rounded-full overflow-hidden border-[10px] border-slate-900 shadow-2xl
+                            ${disabled && !isSpinning ? 'opacity-50 cursor-not-allowed grayscale' : 'hover:scale-105 cursor-pointer drop-shadow-[0_20px_40px_rgba(245,158,11,0.5)]'}
+                        `}
+                        animate={isSpinning ? { x: [-2, 2, -2, 2, 0], y: [-2, 2, -2, 2, 0] } : {}}
+                        transition={isSpinning ? { duration: 0.1, repeat: Infinity } : {}}
+                    >
+                        {/* The realistic engine photo uploaded by user */}
+                        <div 
+                            className={`absolute inset-0 bg-cover bg-no-repeat transition-all duration-[2s] ${isSpinning ? 'scale-110 animate-spin-fast' : 'scale-100'}`}
+                            style={{ 
+                                backgroundImage: isSpinning ? "url('/image/engine_animated.png')" : "url('/image/engine.png')",
+                                backgroundPosition: "45% 55%", // Focus on the engine core
+                                backgroundSize: "180%"
+                            }}
+                        ></div>
+
+                        {/* Intense Heat Distortion / Glow overlay when running */}
+                        {isSpinning && (
+                            <motion.div 
+                                className="absolute inset-0 bg-orange-500/10 mix-blend-color-burn pointer-events-none"
+                                animate={{ opacity: [0.1, 0.4, 0.1] }}
+                                transition={{ duration: 0.1, repeat: Infinity }}
+                            />
+                        )}
+
+                        {/* Flat UI Overlay for Button Text */}
+                        {!isSpinning && (
+                            <div className="absolute inset-0 flex items-center justify-center z-40 bg-black/50 rounded-full backdrop-blur-[2px] group hover:bg-transparent transition-all duration-300 transform-gpu">
+                                <span className="text-white font-bold text-sm tracking-widest uppercase drop-shadow-[0_2px_4px_rgba(0,0,0,1)] group-hover:opacity-0 transition-opacity">
+                                    Ignite<br/>Afterburner
+                                </span>
+                            </div>
+                        )}
+                    </motion.button>
+                    <div className="mt-12 text-center">
+                        <span className={`text-[12px] font-bold uppercase tracking-widest ${isSpinning ? 'text-orange-500 animate-pulse drop-shadow-[0_0_5px_rgba(249,115,22,0.8)]' : 'text-gray-500'}`}>
+                            {isSpinning ? 'Afterburner Engaged - Pipeline Running' : 'Turbine Standby'}
+                        </span>
+                    </div>
+                </div>
+            );
+        };
+
+        const Node = ({ node, isActive }) => {
+            let primaryColor = '#3B82F6';
+            if (node.status === 'completed') primaryColor = '#10B981';
+            if (node.status === 'error') primaryColor = '#EF4444';
+            if (node.status === 'healing') primaryColor = '#F59E0B';
+            if (node.status === 'waiting' || node.status === 'pending') primaryColor = '#6B7280';
+
+            return (
+                <motion.div 
+                    className="absolute flex flex-col items-center justify-start cursor-pointer w-32 h-[180px]"
+                    style={{ left: node.x, top: node.y, zIndex: 10 }}
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                >
+                    <AgentRobot node={node} primaryColor={primaryColor} />
+                </motion.div>
+            );
+        };
+
+        // --- Main App ---
+        const App = () => {
+            const [nodes, setNodes] = useState(INITIAL_NODES);
+            const [logs, setLogs] = useState([]);
+            const [terminalOutput, setTerminalOutput] = useState([]);
+            const [activePrompt, setActivePrompt] = useState(null);
+            const [inputValue, setInputValue] = useState('');
+            const [state, setState] = useState('connecting'); 
+            const ws = useRef(null);
+            const terminalEndRef = useRef(null);
+            
+            const addLog = (msg, type = 'info') => {
+                const time = new Date().toLocaleTimeString('en-US', { hour12: false });
+                setLogs(prev => [...prev, { time, source: 'Pipeline', msg, type }]);
+            };
+
+            const appendTerminal = (text) => {
+                setTerminalOutput(prev => [...prev, text]);
+            };
+
+            const updateNode = (id, updates) => {
+                setNodes(ns => ns.map(n => n.id === id ? { ...n, ...updates } : n));
+            };
+
+            // Auto-scroll terminal
+            useEffect(() => {
+                if(terminalEndRef.current) {
+                    terminalEndRef.current.scrollIntoView({ behavior: 'smooth' });
+                }
+            }, [terminalOutput, activePrompt]);
+
+            useEffect(() => {
+                ws.current = new WebSocket('ws://localhost:8000/ws');
+                ws.current.onopen = () => {
+                    setState('ready_to_start');
+                };
+                ws.current.onmessage = (event) => {
+                    const data = JSON.parse(event.data);
+                    if (data.type === 'log') {
+                        // Append to the visual terminal
+                        appendTerminal(data.message);
+                        
+                        // Smart Visualization Sync: Detect agent handshakes and status
+                        const msg = data.message;
+                        if (msg.includes('Jira Agent analyzing ticket')) {
+                            updateNode('jira', {status: 'running', time: '...'});
+                        }
+                        if (msg.includes('TICKET REQUIREMENTS')) {
+                            updateNode('jira', {status: 'completed', time: 'Done'});
+                        }
+                        if (msg.includes('DOCUMENTATION AGENT')) {
+                            updateNode('doc', {status: 'running', time: '...'});
+                        }
+                        if (msg.includes('Document saved:')) {
+                            updateNode('doc', {status: 'completed', time: 'Done'});
+                        }
+                        if (msg.includes('DREMIO AGENT')) {
+                            updateNode('dremio', {status: 'running', time: '...'});
+                        }
+                        if (msg.includes('Validation FAILED')) {
+                            updateNode('dremio', {status: 'error'});
+                        }
+                        if (msg.includes('Intercepting error') || msg.includes('auto-fix') || msg.includes('Rewriting SQL')) {
+                            updateNode('dremio', {status: 'healing'});
+                        }
+                        if (msg.includes('VDS created successfully')) {
+                            updateNode('dremio', {status: 'completed', time: 'Done'});
+                        }
+                        if (msg.includes('QLIK AGENT')) {
+                            updateNode('qlik', {status: 'running', time: '...'});
+                        }
+                        if (msg.includes('QLIK SENSE DASHBOARD READY')) {
+                            updateNode('qlik', {status: 'completed', time: 'Done'});
+                        }
+                        if (msg.includes('GITHUB AGENT') || msg.includes('Validating local codebase')) {
+                            updateNode('git', {status: 'running', time: '...'});
+                        }
+                        if (msg.includes('WORKFLOW COMPLETE')) {
+                            updateNode('git', {status: 'completed', time: 'Done'});
+                        }
+
+                    } else if (data.type === 'prompt') {
+                        // Backend requires user input
+                        setActivePrompt(data.message);
+                        setState('waiting_input');
+                        
+                        // Infer wait states for graph
+                        if (data.message.includes('Select option') || data.message.includes('Select sprint') || data.message.includes('Select ticket')) {
+                            updateNode('jira', {status: 'waiting'});
+                        }
+                    } else if (data.type === 'error') {
+                        addLog(data.message, 'error');
+                        appendTerminal(`[SYSTEM ERROR] ${data.message}`);
+                    } else if (data.type === 'done') {
+                        setState('done');
+                    }
+                };
+                ws.current.onclose = () => {
+                    addLog('Disconnected from backend.', 'error');
+                    setState('disconnected');
+                };
+                return () => ws.current.close();
+            }, []);
+
+            const handleSubmit = (e) => {
+                e.preventDefault();
+                if (!activePrompt) return;
+                
+                // Echo the input to the terminal visually
+                appendTerminal(`${activePrompt}${inputValue}`);
+                
+                // Send to backend
+                ws.current.send(inputValue);
+                
+                setInputValue('');
+                setActivePrompt(null);
+                setState('processing');
+                
+                // Clear waiting states on nodes
+                setNodes(ns => ns.map(n => n.status === 'waiting' ? { ...n, status: 'pending' } : n));
+            };
+
+            return (
+                <div className="flex h-screen w-screen font-sans text-white overflow-hidden relative bg-black">
+                    
+                    {/* Left Canvas Area */}
+                    <div className="flex-1 relative grid-bg flex flex-col z-10 bg-black/40 overflow-hidden">
+                        <video autoPlay loop muted playsInline className="video-bg">
+                            <source src="/image/asl_airlines_edited.mp4" type="video/mp4" />
+                        </video>
+                        {/* Header */}
+                        <div className="h-14 glass flex items-center px-6 justify-between border-b border-white/10 z-20">
+                            <div className="flex items-center gap-4">
+                                <img src="https://aslairlines.be/wp-content/uploads/2022/09/asl_belgium_white_logo.png" alt="ASL Airlines" className="h-6 object-contain drop-shadow-md" />
+                                <h1 className="font-semibold tracking-wide">DataLake Workflow Orchestrator</h1>
+                            </div>
+                            <div className="flex items-center gap-4">
+                                <div className="flex gap-1.5 items-center mr-2">
+                                    <div className={`w-3 h-3 rounded-full transition-all duration-300 ${state === 'disconnected' ? 'bg-red-500 shadow-[0_0_10px_red]' : 'bg-red-900/50'}`} title="Offline"></div>
+                                    <div className={`w-3 h-3 rounded-full transition-all duration-300 ${state === 'connecting' ? 'bg-amber-500 shadow-[0_0_10px_orange]' : 'bg-amber-900/50'}`} title="Connecting"></div>
+                                    <div className={`w-3 h-3 rounded-full transition-all duration-300 ${['ready_to_start', 'processing'].includes(state) ? 'bg-green-500 shadow-[0_0_10px_lime]' : 'bg-green-900/50'}`} title="Connected"></div>
+                                </div>
+                                <button onClick={() => window.location.reload()} className="hover:text-white text-gray-400 transition-colors flex items-center gap-2 text-sm bg-white/5 px-3 py-1.5 rounded border border-white/10">
+                                    <RefreshCw size={14} /> Restart
+                                </button>
+                            </div>
+                        </div>
+                        
+                        {/* Nodes Area */}
+                        <div className="flex-1 relative overflow-auto flex items-start justify-center">
+                            <div className="relative min-w-[1000px] min-h-[1200px] p-10">
+                            {/* Draw Edges */}
+                            {EDGES.map((edge, i) => {
+                                const source = nodes.find(n => n.id === edge.source);
+                                const target = nodes.find(n => n.id === edge.target);
+                                let isActive = false;
+                                
+                                // Handshake visual logic based on logs
+                                const lastLog = terminalOutput[terminalOutput.length - 1] || '';
+                                if (source.id === 'jira' && target.id === 'doc' && (lastLog.includes('TICKET REQUIREMENTS') || lastLog.includes('Proceed to Documentation'))) isActive = true;
+                                if (source.id === 'doc' && target.id === 'dremio' && (lastLog.includes('Document saved') || lastLog.includes('Proceed to Dremio'))) isActive = true;
+                                if (source.id === 'dremio' && target.id === 'qlik' && (lastLog.includes('VDS created') || lastLog.includes('Build QlikSense') || lastLog.includes('Jira Agent analyzing ticket') || lastLog.includes('VDS path') || lastLog.includes('App name'))) isActive = true;
+                                if (source.id === 'qlik' && target.id === 'git' && (lastLog.includes('Codebase modified') || lastLog.includes('Validating local codebase'))) isActive = true;
+                                if (source.id === 'qlik' && target.id === 'jira' && (lastLog.includes('separate JIRA ticket for Qlik?') || lastLog.includes('Select option') || lastLog.includes('Loading sprints') || lastLog.includes('Select sprint number') || lastLog.includes('Select assignee number') || lastLog.includes('Select ticket number'))) isActive = true;
+                                if (source.id === 'jira' && target.id === 'qlik' && (lastLog.includes('Jira Agent analyzing ticket') || lastLog.includes('VDS path') || lastLog.includes('App name') || lastLog.includes('Qlik space') || lastLog.includes('Ready to build dashboard') || lastLog.includes('Proceed with Qlik dashboard creation?'))) isActive = true;
+
+                                // Fallback generic flow
+                                if (source.status === 'completed' && (target.status === 'running' || target.status === 'healing')) isActive = true;
+
+                                return (
+                                    <Edge 
+                                        key={i}
+                                        sourceNode={source}
+                                        targetNode={target}
+                                        isActive={isActive}
+                                        isCurved={edge.isCurved}
+                                        isCurvedReverse={edge.isCurvedReverse}
+                                    />
+                                );
+                            })}
+
+                            {/* Draw Nodes */}
+                            {nodes.map(node => <Node key={node.id} node={node} />)}
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Right-Side Interactive Terminal Console */}
+                    <div className="w-[500px] xl:w-[600px] glass border-l border-white/10 z-20 flex flex-col bg-[#080808]/95 shadow-[-20px_0_50px_rgba(0,0,0,0.8)] relative font-mono text-sm shrink-0">
+                        <div className="absolute top-0 left-0 w-1 h-full bg-gradient-to-b from-transparent via-primary/30 to-transparent"></div>
+                        
+                        <div className="border-b border-white/10 relative">
+                            <JetEngineButton 
+                                onClick={() => {
+                                    if (state === 'ready_to_start') {
+                                        ws.current.send("START_WORKFLOW");
+                                        setState("processing");
+                                    }
+                                }}
+                                disabled={state !== 'ready_to_start'}
+                                isSpinning={['processing', 'waiting_input'].includes(state)}
+                            />
+                        </div>
+                            
+                        <div className="h-10 border-b border-white/10 flex items-center px-6 bg-white/5 text-gray-300 text-xs gap-3 shadow-inner">
+                            <Activity size={16} className="text-primary" /> <span className="font-sans font-semibold tracking-widest uppercase">Executive Event Log</span>
+                        </div>
+
+                        <div className="flex-1 overflow-y-auto p-6 flex flex-col gap-3 text-gray-300">
+                            {terminalOutput.map((line, i) => (
+                                <div key={i} className="p-3 bg-white/[0.03] border border-white/5 rounded-lg whitespace-pre-wrap leading-relaxed tracking-wide shadow-sm hover:bg-white/[0.06] transition-colors border-l-2 border-l-primary/40">
+                                    {line}
+                                </div>
+                            ))}
+                            
+                            {activePrompt && (
+                                <div className="mt-4 text-primary font-bold flex items-center bg-primary/10 p-4 rounded-lg border border-primary/30 shadow-[0_0_15px_rgba(59,130,246,0.15)]">
+                                    <span className="whitespace-pre-wrap">{activePrompt}</span>
+                                    <form onSubmit={handleSubmit} className="flex-1 ml-3">
+                                        <input 
+                                            autoFocus
+                                            type="text" 
+                                            value={inputValue}
+                                            onChange={(e) => setInputValue(e.target.value)}
+                                            className="w-full bg-transparent outline-none text-white font-bold placeholder-primary/40"
+                                            placeholder="Type your response..."
+                                        />
+                                    </form>
+                                    <div className="w-2 h-5 bg-primary animate-pulse ml-2" />
+                                </div>
+                            )}
+                            <div ref={terminalEndRef} />
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+        const root = createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>

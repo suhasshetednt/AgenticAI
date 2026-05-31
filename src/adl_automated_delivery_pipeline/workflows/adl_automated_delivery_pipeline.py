@@ -91,6 +91,8 @@ def _jira() -> Any:
     return JIRA(
         server=os.getenv("JIRA_INSTANCE_URL"),
         basic_auth=(username, token) if username and token else None,
+        max_retries=0,
+        timeout=10,
     )
 
 
@@ -278,9 +280,15 @@ def _pick_ticket(issues: list[dict[str, Any]], assignee: str) -> dict[str, Any] 
         return None
 
     _header(f"TICKETS  --  {assignee}")
+    # Column-aligned table — renders cleanly in the monospace web console and the CLI.
+    print(f"  {'#':>2}   {'Key':<9} {'Status':<17} {'Priority':<9} Summary")
+    print(f"  {'-' * 2}   {'-' * 9} {'-' * 17} {'-' * 9} {'-' * 45}")
     for idx, t in enumerate(my_issues, 1):
-        print(f"  [{idx:2d}]  {t['id']:<12}  [{t['state']:<15}]  [{t['priority']:<8}]  {t['summary']}")
-    print(f"  [ 0]  Back")
+        summary = t["summary"] or ""
+        if len(summary) > 55:
+            summary = summary[:54].rstrip() + "..."
+        print(f"  {idx:>2d}   {t['id']:<9} {t['state']:<17} {t['priority']:<9} {summary}")
+    print(f"  {'0':>2}   Back")
     print(_DIV)
 
     while True:

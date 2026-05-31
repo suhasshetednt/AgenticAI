@@ -1,0 +1,795 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ASL Airlines — ADL Workflow Orchestrator</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700&family=Share+Tech+Mono&family=Exo+2:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #04080f;
+  --border: rgba(0,180,255,0.15);
+  --accent: #00b4ff;
+  --text: #c8dff5;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font-family:'Exo 2',sans-serif;overflow:hidden;height:100vh;width:100vw;}
+.bg-grid{
+  background-image:
+    radial-gradient(ellipse 70% 50% at 25% 10%,rgba(0,80,180,0.13) 0%,transparent 60%),
+    radial-gradient(ellipse 60% 40% at 80% 90%,rgba(200,80,0,0.07) 0%,transparent 60%),
+    linear-gradient(rgba(0,180,255,0.022) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(0,180,255,0.022) 1px,transparent 1px);
+  background-size:100% 100%,100% 100%,48px 48px,48px 48px;
+}
+.video-bg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0.09;z-index:0;mix-blend-mode:screen;}
+.scan-lines{position:absolute;inset:0;pointer-events:none;z-index:1;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,0.04) 2px,rgba(0,0,0,0.04) 4px);}
+.glass{background:rgba(6,14,28,0.85);backdrop-filter:blur(20px);border:1px solid var(--border);}
+::-webkit-scrollbar{width:4px;}
+::-webkit-scrollbar-thumb{background:rgba(0,180,255,0.2);border-radius:10px;}
+
+/* Layout */
+.layout{display:flex;height:100vh;width:100vw;}
+.canvas-panel{flex:1;position:relative;display:flex;flex-direction:column;overflow:hidden;}
+.right-panel{width:460px;flex-shrink:0;display:flex;flex-direction:column;background:rgba(2,6,16,0.97);border-left:1px solid var(--border);box-shadow:-20px 0 60px rgba(0,0,0,0.8);position:relative;z-index:20;}
+.right-panel::before{content:'';position:absolute;top:0;left:0;width:1px;height:100%;background:linear-gradient(180deg,transparent,rgba(0,180,255,0.4) 30%,rgba(0,180,255,0.4) 70%,transparent);}
+
+/* Top bar */
+.topbar{height:52px;display:flex;align-items:center;padding:0 20px;justify-content:space-between;border-bottom:1px solid var(--border);position:relative;z-index:20;background:rgba(4,10,22,0.9);}
+.topbar-title{font-family:'Orbitron',monospace;font-size:11px;letter-spacing:2px;color:var(--accent);font-weight:600;}
+.topbar-sub{font-family:'Orbitron',monospace;font-size:8px;letter-spacing:2.5px;color:rgba(0,180,255,0.45);text-transform:uppercase;margin-top:2px;}
+.metric-pill{background:rgba(0,180,255,0.05);border:1px solid rgba(0,180,255,0.12);border-radius:5px;padding:5px 12px;}
+.metric-label{font-family:'Orbitron',monospace;font-size:8px;letter-spacing:2px;color:rgba(0,180,255,0.45);}
+.metric-val{font-family:'Share Tech Mono',monospace;font-size:11px;color:var(--accent);}
+.led{width:9px;height:9px;border-radius:50%;transition:all .3s;}
+.restart-btn{display:flex;align-items:center;gap:6px;font-family:'Share Tech Mono',monospace;font-size:10px;letter-spacing:1px;background:rgba(0,180,255,0.05);border:1px solid var(--border);color:var(--accent);padding:5px 12px;border-radius:4px;cursor:pointer;}
+.restart-btn:hover{background:rgba(0,180,255,0.1);}
+
+/* Agent canvas */
+.agent-canvas{flex:1;position:relative;overflow:auto;z-index:10;}
+.canvas-inner{position:relative;}
+
+/* Status bar */
+.statusbar{height:30px;display:flex;align-items:center;padding:0 20px;gap:16px;background:rgba(0,0,0,0.65);border-top:1px solid var(--border);position:relative;z-index:20;}
+.status-label{font-family:'Orbitron',monospace;font-size:8px;letter-spacing:2.5px;text-transform:uppercase;color:rgba(0,180,255,0.45);display:flex;align-items:center;gap:6px;}
+.status-dot{width:6px;height:6px;border-radius:50%;}
+
+/* Turbine */
+.turbine-section{border-bottom:1px solid var(--border);background:rgba(0,0,0,0.45);padding:20px;display:flex;flex-direction:column;align-items:center;position:relative;}
+.turbine-section::before,.turbine-section::after{content:'';position:absolute;width:10px;height:10px;}
+.turbine-section::before{top:8px;left:8px;border-top:1.5px solid rgba(0,180,255,0.45);border-left:1.5px solid rgba(0,180,255,0.45);}
+.turbine-section::after{bottom:8px;right:8px;border-bottom:1.5px solid rgba(0,180,255,0.45);border-right:1.5px solid rgba(0,180,255,0.45);}
+.engine-label{font-family:'Orbitron',monospace;font-size:8px;letter-spacing:3px;color:rgba(0,180,255,0.45);margin-bottom:14px;}
+.engine-btn{background:transparent;border:none;cursor:pointer;outline:none;border-radius:50%;padding:6px;transition:transform .3s;}
+.engine-btn:hover:not(:disabled){transform:scale(1.05);}
+.engine-btn:disabled{cursor:not-allowed;opacity:0.4;}
+.status-readout{display:flex;align-items:center;gap:8px;margin-top:10px;}
+.status-dot-lg{width:8px;height:8px;border-radius:50%;transition:background .3s;}
+.status-text{font-family:'Orbitron',monospace;font-size:9px;letter-spacing:2.5px;}
+.rpm-bars{display:flex;gap:3px;margin-top:10px;}
+.rpm-bar{width:5px;height:4px;border-radius:1px;}
+
+/* Terminal */
+.term-header{padding:8px 18px;border-bottom:1px solid var(--border);background:rgba(0,180,255,0.03);display:flex;align-items:center;gap:8px;}
+.term-title{font-family:'Orbitron',monospace;font-size:8px;letter-spacing:3px;color:rgba(0,180,255,0.65);}
+.term-body{flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:4px;}
+.term-line{padding:5px 10px;border-left:2px solid rgba(0,180,255,0.18);background:rgba(0,180,255,0.02);border-radius:0 3px 3px 0;font-family:'Share Tech Mono',monospace;font-size:10.5px;line-height:1.6;color:#7aa8c8;letter-spacing:.3px;white-space:pre-wrap;word-break:break-all;transition:border-color .2s;}
+.term-line:hover{border-color:rgba(0,180,255,0.4);}
+.term-line.sep{border-color:rgba(0,180,255,0.07);color:rgba(0,180,255,0.22);}
+.term-line.hdr{border-color:var(--accent);color:var(--accent);letter-spacing:1px;}
+.term-empty{flex:1;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:8px;opacity:.28;}
+.term-empty-label{font-family:'Orbitron',monospace;font-size:8px;letter-spacing:3px;color:var(--accent);}
+.prompt-block{border:1px solid rgba(0,180,255,0.35);background:rgba(0,180,255,0.05);border-radius:5px;padding:10px 12px;display:flex;align-items:center;gap:8px;box-shadow:0 0 20px rgba(0,180,255,0.08);margin-top:6px;}
+.prompt-text{font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--accent);white-space:pre-wrap;max-width:55%;flex-shrink:0;}
+.prompt-form{flex:1;display:flex;align-items:center;gap:6px;}
+.prompt-input{background:transparent;border:none;outline:none;color:var(--accent);font-family:'Share Tech Mono',monospace;font-size:11px;flex:1;}
+.cursor-blink{width:7px;height:13px;background:var(--accent);animation:cur 1s step-end infinite;}
+@keyframes cur{0%,100%{opacity:1}50%{opacity:0}}
+.term-footer{padding:6px 18px;border-top:1px solid var(--border);background:rgba(0,0,0,0.5);display:flex;justify-content:space-between;align-items:center;}
+.footer-label{font-family:'Orbitron',monospace;font-size:7.5px;letter-spacing:2.5px;color:rgba(0,180,255,0.35);}
+
+/* Turbine spin */
+.blades{transform-origin:100px 100px;}
+.blades.spinning{animation:spin .7s linear infinite;}
+.blades.idle{animation:spin 5s linear infinite;}
+@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+
+/* Agent node */
+.agent-node{position:absolute;display:flex;flex-direction:column;align-items:center;cursor:default;}
+.robot-wrap{position:relative;display:flex;flex-direction:column;align-items:center;}
+
+/* Neo glow */
+.neo-glow{position:absolute;border-radius:50%;pointer-events:none;transition:opacity .5s;}
+
+/* Animations */
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
+@keyframes pulse-ring{0%{transform:scale(1);opacity:.7}100%{transform:scale(2.2);opacity:0}}
+@keyframes glow-breathe{0%,100%{opacity:.5;transform:scale(1)}50%{opacity:1;transform:scale(1.08)}}
+@keyframes scan{0%{top:20%}50%{top:70%}100%{top:20%}}
+
+/* Edge SVG overlay */
+.edge-svg{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:5;}
+
+/* Miniplane */
+@keyframes plane-fly{0%{offset-distance:0%}100%{offset-distance:100%}}
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="importmap">
+{"imports":{"react":"https://esm.sh/react@18.2.0","react-dom/client":"https://esm.sh/react-dom@18.2.0/client","framer-motion":"https://esm.sh/framer-motion@10.16.4?deps=react@18.2.0,react-dom@18.2.0","lucide-react":"https://esm.sh/lucide-react@0.292.0?deps=react@18.2.0"}}
+</script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script type="text/babel" data-type="module">
+import React,{useState,useEffect,useRef,useCallback}from'react';
+import{createRoot}from'react-dom/client';
+import{motion,AnimatePresence}from'framer-motion';
+import{Activity,RefreshCw,Zap}from'lucide-react';
+
+// ── CONFIG ──────────────────────────────────────────────────────────────────
+// Layout: centered column, Dremio+Qlik on same row, Git below Qlik
+// Canvas width 1000. Center col x=500, right col x=700
+const CX = 430; // center x for vertical chain
+const RX = 700; // right column x
+const ROBOT_W = 110;
+
+const INITIAL_NODES = [
+  {id:'jira',  label:'Jira Agent',     x:CX, y:60,  color:'#3B82F6', dark:'#1d4ed8', glow:'59,130,246',  icon:'jira',  status:'pending'},
+  {id:'doc',   label:'Documentation',  x:CX, y:260, color:'#10B981', dark:'#047857', glow:'16,185,129',  icon:'doc',   status:'pending'},
+  {id:'dremio',label:'Dremio Agent',   x:CX, y:460, color:'#F97316', dark:'#c2410c', glow:'249,115,22',  icon:'dremio',status:'pending'},
+  {id:'qlik',  label:'Qlik Agent',     x:RX, y:460, color:'#22C55E', dark:'#15803d', glow:'34,197,94',   icon:'qlik',  status:'pending'},
+  {id:'git',   label:'GitHub Agent',   x:RX, y:660, color:'#A855F7', dark:'#7e22ce', glow:'168,85,247',  icon:'git',   status:'pending'},
+];
+
+// Active edges list — each can carry a plane
+const ALL_EDGES = [
+  {id:'j-d',  src:'jira',  tgt:'doc'},
+  {id:'d-dr', src:'doc',   tgt:'dremio'},
+  {id:'dr-q', src:'dremio',tgt:'qlik'},
+  {id:'q-g',  src:'qlik',  tgt:'git'},
+  {id:'q-j',  src:'qlik',  tgt:'jira', curved:true},
+  {id:'j-q',  src:'jira',  tgt:'qlik', curved2:true},
+];
+
+// ── ROBOT SVG (matching original style exactly) ─────────────────────────────
+// Original: small oval head with 2 dot-eyes, large rounded-square body with icon, stubby arms, tapered spike bottom
+const RobotSVG = ({color, dark, icon, status, size=110}) => {
+  const isRun = status==='running';
+  const isDone = status==='completed';
+  const isErr = status==='error';
+  const isHeal = status==='healing';
+
+  // visor color per agent
+  const visorColors = {'#3B82F6':'#00cfff','#10B981':'#5eead4','#F97316':'#fbbf24','#22C55E':'#86efac','#A855F7':'#d8b4fe'};
+  const vc = visorColors[color]||'#fff';
+
+  const s = size/110; // scale factor
+  const W = 110*s, H = 170*s;
+
+  return (
+    <svg width={W} height={H} viewBox={`0 0 110 170`} xmlns="http://www.w3.org/2000/svg" style={{overflow:'visible'}}>
+      <defs>
+        {/* Body gradient - glossy 3D like original */}
+        <radialGradient id={`bg${color.slice(1)}`} cx="35%" cy="28%" r="75%">
+          <stop offset="0%" stopColor={color} stopOpacity="1"/>
+          <stop offset="45%" stopColor={color} stopOpacity="0.85"/>
+          <stop offset="100%" stopColor={dark} stopOpacity="1"/>
+        </radialGradient>
+        {/* Head gradient */}
+        <radialGradient id={`hg${color.slice(1)}`} cx="38%" cy="30%" r="70%">
+          <stop offset="0%" stopColor={color} stopOpacity="0.9"/>
+          <stop offset="100%" stopColor={dark}/>
+        </radialGradient>
+        {/* Shine overlay */}
+        <linearGradient id={`sh${color.slice(1)}`} x1="0%" y1="0%" x2="60%" y2="100%">
+          <stop offset="0%" stopColor="rgba(255,255,255,0.30)"/>
+          <stop offset="50%" stopColor="rgba(255,255,255,0.06)"/>
+          <stop offset="100%" stopColor="rgba(255,255,255,0)"/>
+        </linearGradient>
+        <filter id={`gf${color.slice(1)}`}>
+          <feGaussianBlur in="SourceGraphic" stdDeviation="2.5" result="b"/>
+          <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+        </filter>
+        <filter id={`gf2${color.slice(1)}`}>
+          <feGaussianBlur in="SourceGraphic" stdDeviation="5" result="b"/>
+          <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+        </filter>
+      </defs>
+
+      {/* ── ANTENNA ── */}
+      <line x1="55" y1="14" x2="55" y2="4" stroke={color} strokeWidth="2" strokeLinecap="round"/>
+      <circle cx="55" cy="3" r="3.5" fill={vc} filter={`url(#gf${color.slice(1)})`} opacity="0.9">
+        {isRun && <animate attributeName="r" values="3;5;3" dur="0.8s" repeatCount="indefinite"/>}
+        {isRun && <animate attributeName="opacity" values="0.7;1;0.7" dur="0.8s" repeatCount="indefinite"/>}
+      </circle>
+      <circle cx="55" cy="3" r="1.5" fill="white"/>
+
+      {/* ── HEAD — small oval ── */}
+      <rect x="34" y="14" width="42" height="28" rx="13" fill={`url(#hg${color.slice(1)})`}/>
+      <rect x="34" y="14" width="42" height="28" rx="13" fill={`url(#sh${color.slice(1)})`}/>
+      <rect x="34" y="14" width="42" height="28" rx="13" fill="none" stroke={color} strokeWidth="1.2" strokeOpacity="0.6"/>
+      {/* Eyes strip */}
+      <rect x="39" y="22" width="32" height="12" rx="5" fill="rgba(0,0,0,0.7)"/>
+      {/* Two dot eyes */}
+      <circle cx="48" cy="28" r="4" fill={vc} filter={`url(#gf${color.slice(1)})`} opacity="0.95">
+        {isRun && <animate attributeName="cx" values="46;50;46" dur="1.5s" repeatCount="indefinite"/>}
+      </circle>
+      <circle cx="48" cy="28" r="2" fill="white" opacity="0.85">
+        {isRun && <animate attributeName="cx" values="46;50;46" dur="1.5s" repeatCount="indefinite"/>}
+      </circle>
+      <circle cx="62" cy="28" r="4" fill={vc} filter={`url(#gf${color.slice(1)})`} opacity="0.95">
+        {isRun && <animate attributeName="cx" values="60;64;60" dur="1.5s" repeatCount="indefinite"/>}
+      </circle>
+      <circle cx="62" cy="28" r="2" fill="white" opacity="0.85">
+        {isRun && <animate attributeName="cx" values="60;64;60" dur="1.5s" repeatCount="indefinite"/>}
+      </circle>
+
+      {/* ── NECK connector ── */}
+      <rect x="50" y="42" width="10" height="8" rx="2" fill={dark}/>
+      <line x1="53" y1="43" x2="53" y2="49" stroke={vc} strokeWidth="0.8" opacity="0.5"/>
+      <line x1="57" y1="43" x2="57" y2="49" stroke={vc} strokeWidth="0.8" opacity="0.5"/>
+
+      {/* ── BODY — large rounded square ── */}
+      <rect x="14" y="50" width="82" height="80" rx="22" fill={`url(#bg${color.slice(1)})`}/>
+      <rect x="14" y="50" width="82" height="80" rx="22" fill={`url(#sh${color.slice(1)})`}/>
+      <rect x="14" y="50" width="82" height="80" rx="22" fill="none" stroke={color} strokeWidth="1.5" strokeOpacity="0.65"/>
+      {/* Body top ridge highlight */}
+      <rect x="24" y="50" width="62" height="8" rx="6" fill="rgba(255,255,255,0.14)"/>
+
+      {/* ── ARMS — stubby, same style as original ── */}
+      {/* Left arm */}
+      <rect x="2" y="60" width="16" height="44" rx="8" fill={`url(#bg${color.slice(1)})`} stroke={color} strokeWidth="1" strokeOpacity="0.5"/>
+      <rect x="2" y="60" width="16" height="44" rx="8" fill={`url(#sh${color.slice(1)})`}/>
+      {/* Left arm lower glow */}
+      <ellipse cx="10" cy="102" rx="7" ry="5" fill={vc} opacity="0.4" filter={`url(#gf${color.slice(1)})`}/>
+      {/* Right arm */}
+      <rect x="92" y="60" width="16" height="44" rx="8" fill={`url(#bg${color.slice(1)})`} stroke={color} strokeWidth="1" strokeOpacity="0.5"/>
+      <rect x="92" y="60" width="16" height="44" rx="8" fill={`url(#sh${color.slice(1)})`}/>
+      <ellipse cx="100" cy="102" rx="7" ry="5" fill={vc} opacity="0.4" filter={`url(#gf${color.slice(1)})`}/>
+
+      {/* ── CHEST ICON circle ── */}
+      <circle cx="55" cy="90" r="26" fill="rgba(0,0,0,0.6)" stroke={color} strokeWidth="2" filter={`url(#gf${color.slice(1)})`}/>
+      <circle cx="55" cy="90" r="22" fill="rgba(0,0,0,0.5)"/>
+      {/* Orbit ring */}
+      <circle cx="55" cy="90" r="24" fill="none" stroke={vc} strokeWidth="0.8" strokeOpacity="0.3" strokeDasharray="4 3">
+        <animateTransform attributeName="transform" type="rotate" from="0 55 90" to="360 55 90" dur="5s" repeatCount="indefinite"/>
+      </circle>
+      {/* Running pulse ring */}
+      {isRun && <circle cx="55" cy="90" r="26" fill="none" stroke={vc} strokeWidth="2" opacity="0">
+        <animate attributeName="r" values="26;40;26" dur="1.5s" repeatCount="indefinite"/>
+        <animate attributeName="opacity" values=".6;0;.6" dur="1.5s" repeatCount="indefinite"/>
+      </circle>}
+
+      {/* Agent specific icon */}
+      <IconShape id={icon} cx={55} cy={90} color={color} vc={vc} size={18}/>
+
+      {/* ── TAPERED BOTTOM SPIKE (like original) ── */}
+      <path d="M 42 130 L 55 155 L 68 130 Z" fill={dark} opacity="0.9"/>
+      <path d="M 46 130 L 55 148 L 64 130 Z" fill={color} opacity="0.5"/>
+      {/* Bottom glow/thruster */}
+      <ellipse cx="55" cy="155" rx="10" ry="4" fill={vc} opacity={isRun?0.7:0.25} filter={`url(#gf2${color.slice(1)})`}>
+        {isRun && <animate attributeName="ry" values="3;6;3" dur="0.25s" repeatCount="indefinite"/>}
+        {isRun && <animate attributeName="opacity" values=".5;.9;.5" dur="0.25s" repeatCount="indefinite"/>}
+      </ellipse>
+
+      {/* Status done checkmark */}
+      {isDone && <g filter={`url(#gf${color.slice(1)})`}>
+        <circle cx="88" cy="56" r="9" fill="#10B981" opacity="0.95"/>
+        <path d="M83 56 L87 60 L93 52" stroke="white" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
+      </g>}
+      {isErr && <g filter={`url(#gf${color.slice(1)})`}>
+        <circle cx="88" cy="56" r="9" fill="#EF4444" opacity="0.95"/>
+        <line x1="84" y1="52" x2="92" y2="60" stroke="white" strokeWidth="2" strokeLinecap="round"/>
+        <line x1="92" y1="52" x2="84" y2="60" stroke="white" strokeWidth="2" strokeLinecap="round"/>
+      </g>}
+      {isHeal && <g filter={`url(#gf${color.slice(1)})`}>
+        <circle cx="88" cy="56" r="9" fill="#F59E0B" opacity="0.95"/>
+        <text x="88" y="60" textAnchor="middle" fill="white" fontSize="10" fontWeight="bold">↻</text>
+      </g>}
+    </svg>
+  );
+};
+
+const IconShape = ({id,cx,cy,color,vc,size:s}) => {
+  switch(id){
+    case 'jira': return <g>
+      <path d={`M${cx} ${cy-s} L${cx+s} ${cy} L${cx} ${cy+s} L${cx-s} ${cy}Z`} fill={color} opacity="0.9"/>
+      <path d={`M${cx} ${cy-s} L${cx+s} ${cy} L${cx} ${cy}Z`} fill="rgba(255,255,255,0.3)"/>
+      <circle cx={cx} cy={cy} r={s*0.22} fill={vc}/>
+    </g>;
+    case 'doc': return <g>
+      <rect x={cx-s*0.7} y={cy-s*0.9} width={s*1.4} height={s*1.8} rx="3" fill={color} opacity="0.85"/>
+      {[-.55,-.3,-.05,.2,.45].map((dy,i)=><rect key={i} x={cx-s*0.5} y={cy+dy*s} width={[1,.9,.7,.85,.6][i]*s} height={s*0.13} rx="1" fill="white" opacity={.65-.1*i}/>)}
+    </g>;
+    case 'dremio': return <g>
+      <path d={`M${cx-s*.6} ${cy+s*.3} Q${cx} ${cy-s*.9} ${cx+s*.6} ${cy+s*.3} L${cx} ${cy+s*.85}Z`} fill={color} opacity="0.9"/>
+      <circle cx={cx} cy={cy} r={s*.28} fill={vc} opacity="0.9"/>
+      <circle cx={cx} cy={cy} r={s*.13} fill="white"/>
+    </g>;
+    case 'qlik': return <g>
+      <circle cx={cx} cy={cy} r={s*.65} fill="none" stroke={color} strokeWidth="3"/>
+      <circle cx={cx} cy={cy} r={s*.32} fill={color} opacity="0.85"/>
+      <line x1={cx+s*.38} y1={cy-s*.38} x2={cx+s*.7} y2={cy-s*.7} stroke={vc} strokeWidth="3" strokeLinecap="round"/>
+      <circle cx={cx+s*.7} cy={cy-s*.7} r={s*.22} fill={vc}/>
+    </g>;
+    case 'git': return <g>
+      <circle cx={cx} cy={cy-s*.3} r={s*.22} fill={vc} opacity="0.9"/>
+      <circle cx={cx-s*.35} cy={cy+s*.35} r={s*.22} fill={vc} opacity="0.9"/>
+      <circle cx={cx+s*.35} cy={cy+s*.35} r={s*.22} fill={vc} opacity="0.9"/>
+      <line x1={cx} y1={cy-s*.08} x2={cx} y2={cy+s*.13} stroke={vc} strokeWidth="2"/>
+      <path d={`M${cx} ${cy+s*.13} Q${cx-s*.18} ${cy+s*.35} ${cx-s*.35} ${cy+s*.35}`} stroke={vc} strokeWidth="2" fill="none"/>
+      <path d={`M${cx} ${cy+s*.13} Q${cx+s*.18} ${cy+s*.35} ${cx+s*.35} ${cy+s*.35}`} stroke={vc} strokeWidth="2" fill="none"/>
+    </g>;
+    default: return null;
+  }
+};
+
+// ── NEO GLOW behind robot ────────────────────────────────────────────────────
+const NeoGlow = ({color,glow,status,size=110}) => {
+  const isRun = status==='running';
+  const isDone = status==='completed';
+  if(!isRun && !isDone) return null;
+  const glowColor = isDone?'16,185,129':glow;
+  const intensity = isRun?0.55:0.25;
+  return (
+    <div style={{
+      position:'absolute',
+      top:'50%', left:'50%',
+      transform:'translate(-50%,-50%)',
+      width: size*2.4, height: size*2.4,
+      borderRadius:'50%',
+      background:`radial-gradient(circle, rgba(${glowColor},${intensity}) 0%, rgba(${glowColor},${intensity*0.4}) 35%, transparent 70%)`,
+      pointerEvents:'none',
+      zIndex:0,
+      filter:'blur(2px)',
+    }}>
+      {isRun && (
+        <motion.div style={{
+          position:'absolute', inset:0, borderRadius:'50%',
+          border:`2px solid rgba(${glowColor},0.5)`,
+        }}
+        animate={{scale:[1,1.35,1],opacity:[0.6,0,0.6]}}
+        transition={{duration:2,repeat:Infinity,ease:'easeOut'}}/>
+      )}
+    </div>
+  );
+};
+
+// ── MINI AIRPLANE SVG ───────────────────────────────────────────────────────
+const MiniPlane = ({color}) => (
+  <svg width="22" height="14" viewBox="0 0 22 14" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <filter id="pf"><feGaussianBlur in="SourceGraphic" stdDeviation="1.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    </defs>
+    {/* fuselage */}
+    <ellipse cx="11" cy="7" rx="9" ry="3.5" fill={color} filter="url(#pf)"/>
+    {/* nose */}
+    <ellipse cx="19" cy="7" rx="3" ry="2" fill={color}/>
+    {/* tail */}
+    <polygon points="2,7 0,3 4,7" fill={color} opacity="0.8"/>
+    {/* wing top */}
+    <polygon points="11,7 7,2 15,5" fill={color} opacity="0.9"/>
+    {/* wing bottom */}
+    <polygon points="11,7 7,12 15,9" fill={color} opacity="0.9"/>
+    {/* engine glow */}
+    <ellipse cx="0" cy="7" rx="4" ry="2" fill={color} opacity="0.5" filter="url(#pf)"/>
+  </svg>
+);
+
+// ── EDGE + ANIMATED PLANE ───────────────────────────────────────────────────
+const EdgeLine = ({id,srcNode,tgtNode,active,color,curved,curved2,CANVAS_W,CANVAS_H}) => {
+  const RW=ROBOT_W, RNECK=160; // robot total height for connection point
+
+  // Calculate path for each edge type
+  const getPath = () => {
+    const sx = srcNode.x + RW/2;
+    const sy = srcNode.y + RNECK; // bottom of robot
+    const ex = tgtNode.x + RW/2;
+    const ey = tgtNode.y;          // top of robot
+
+    if(curved){ // qlik -> jira (right to left, up)
+      return `M ${ex+RW/2} ${tgtNode.y+RNECK/2} C ${ex+RW/2+200} ${tgtNode.y+RNECK/2}, ${sx+RW/2+180} ${sy/2+ey/2}, ${sx+RW/2} ${sy/2+ey/2}`;
+      // simplified: bezier from qlik right side up to jira right side
+    }
+    if(curved2){ // jira -> qlik (left to right, down)
+      const sx2 = srcNode.x+RW/2; const sy2=srcNode.y+RNECK/2;
+      const ex2 = tgtNode.x+RW/2; const ey2=tgtNode.y+RNECK/2;
+      return `M ${sx2+RW/2} ${sy2} C ${sx2+RW/2+180} ${sy2}, ${ex2+200} ${ey2}, ${ex2+RW/2} ${ey2}`;
+    }
+    // Same column vertical
+    if(Math.abs(srcNode.x - tgtNode.x)<5){
+      return `M ${sx} ${sy} L ${ex} ${ey}`;
+    }
+    // Horizontal (dremio -> qlik)
+    const midX = (sx+ex)/2; const midY = (sy+ey)/2;
+    return `M ${sx} ${sy} L ${sx} ${midY} L ${ex} ${midY} L ${ex} ${ey}`;
+  };
+
+  const path = getPath();
+  const uid = id.replace(/[^a-z]/g,'');
+
+  return (
+    <g>
+      {/* Base line */}
+      <path d={path} stroke="rgba(255,255,255,0.12)" strokeWidth="1.5" fill="none" strokeDasharray={active?"none":"4 4"}/>
+      {active && <>
+        {/* Glowing active line */}
+        <path d={path} stroke={color} strokeWidth="2" fill="none" opacity="0.5" style={{filter:`drop-shadow(0 0 4px ${color})`}}/>
+        {/* Animated plane */}
+        <g style={{offsetPath:`path('${path}')`,offsetRotate:'auto',animation:`planeFly_${uid} 2s linear infinite`}}>
+          <MiniPlane color={color}/>
+        </g>
+        <style>{`@keyframes planeFly_${uid}{0%{offset-distance:0%}100%{offset-distance:100%}}`}</style>
+      </>}
+    </g>
+  );
+};
+
+// ── AGENT NODE ───────────────────────────────────────────────────────────────
+const AgentNode = ({node}) => {
+  const isRun = node.status==='running';
+  const isDone = node.status==='completed';
+
+  return (
+    <div className="agent-node" style={{left:node.x,top:node.y,width:ROBOT_W,zIndex:10}}>
+      <div className="robot-wrap" style={{position:'relative',alignItems:'center',display:'flex',flexDirection:'column'}}>
+        {/* Neo glow behind */}
+        <NeoGlow color={node.color} glow={node.glow} status={node.status} size={ROBOT_W}/>
+        {/* Robot floats when running */}
+        <motion.div
+          animate={isRun?{y:[0,-9,0]}:isDone?{y:[0,-3,0]}:{}}
+          transition={{duration:isRun?2.5:5,repeat:Infinity,ease:'easeInOut'}}
+          style={{position:'relative',zIndex:1}}
+        >
+          <RobotSVG color={node.color} dark={node.dark} icon={node.icon} status={node.status} size={ROBOT_W}/>
+        </motion.div>
+      </div>
+      {/* Label */}
+      <div style={{marginTop:4,display:'flex',flexDirection:'column',alignItems:'center',gap:2,zIndex:2,position:'relative'}}>
+        <div style={{fontFamily:"'Exo 2',sans-serif",fontSize:11,fontWeight:600,color:'#c8dff5',background:'rgba(0,0,0,0.72)',padding:'3px 10px',borderRadius:4,border:'1px solid rgba(255,255,255,0.08)',backdropFilter:'blur(8px)',whiteSpace:'nowrap',letterSpacing:.4}}>
+          {node.label}
+        </div>
+        <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8.5,letterSpacing:'2px',textTransform:'uppercase',color:
+          isDone?'#10B981':node.status==='error'?'#EF4444':node.status==='healing'?'#F59E0B':isRun?node.color:'#4B5563',
+          padding:'1px 7px',background:`${isDone?'rgba(16,185,129,':isRun?`rgba(${node.glow},`:'rgba(75,85,99,'}0.12)`,borderRadius:2}}>
+          {node.status}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ── TURBINE ──────────────────────────────────────────────────────────────────
+const TurbineSVG = ({spinning,idle}) => {
+  const cls = spinning?'spinning':idle?'idle':'';
+  return (
+    <svg viewBox="0 0 200 200" width="185" height="185" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <radialGradient id="tcg" cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stopColor={spinning?"#ff9900":"#003f7d"}/>
+          <stop offset="100%" stopColor={spinning?"#6b1f00":"#001833"}/>
+        </radialGradient>
+        <filter id="tfg"><feGaussianBlur in="SourceGraphic" stdDeviation="3" result="b"/>
+        <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+        <clipPath id="tcc"><circle cx="100" cy="100" r="86"/></clipPath>
+      </defs>
+      <circle cx="100" cy="100" r="93" fill="none" stroke="rgba(0,180,255,0.28)" strokeWidth="2"/>
+      <circle cx="100" cy="100" r="86" fill="#040d18"/>
+      <g clipPath="url(#tcc)">
+        <g className={`blades ${cls}`}>
+          {Array.from({length:9}).map((_,i)=>{
+            const a=(i*40)*Math.PI/180,r1=18,r2=74;
+            const bc=spinning?`rgba(${175+i*7},${55+i*5},0,.9)`:`rgba(0,${95+i*10},${155+i*5},.8)`;
+            const be=spinning?`rgba(255,${110+i*10},0,.55)`:`rgba(0,${155+i*7},255,.45)`;
+            const ix1=100+r1*Math.cos(a-.24),iy1=100+r1*Math.sin(a-.24);
+            const ix2=100+r1*Math.cos(a+.17),iy2=100+r1*Math.sin(a+.17);
+            const ox1=100+r2*Math.cos(a+.44),oy1=100+r2*Math.sin(a+.44);
+            const ox2=100+r2*Math.cos(a+.08),oy2=100+r2*Math.sin(a+.08);
+            const cp1x=100+41*Math.cos(a-.09),cp1y=100+41*Math.sin(a-.09);
+            const cp2x=100+51*Math.cos(a+.53),cp2y=100+51*Math.sin(a+.53);
+            const d=`M${ix1} ${iy1} C${cp1x} ${cp1y},${cp2x} ${cp2y},${ox1} ${oy1} L${ox2} ${oy2} C${cp2x} ${cp2y},${ix2} ${iy2},${ix2} ${iy2}Z`;
+            return <path key={i} d={d} fill={bc} stroke={be} strokeWidth=".5"/>;
+          })}
+          <circle cx="100" cy="100" r="20" fill={spinning?"rgba(255,70,0,.55)":"rgba(0,70,150,.55)"} filter="url(#tfg)"/>
+          <circle cx="100" cy="100" r="16" fill="#020810"/>
+        </g>
+      </g>
+      <circle cx="100" cy="100" r="12" fill="url(#tcg)" filter="url(#tfg)"/>
+      <circle cx="100" cy="100" r="7" fill={spinning?"#ff8800":"#0077bb"}/>
+      <circle cx="100" cy="100" r="3.5" fill="white" opacity=".9"/>
+      <circle cx="100" cy="100" r="79" fill="none" stroke={spinning?"rgba(255,110,0,.38)":"rgba(0,180,255,.32)"} strokeWidth="2.5" strokeDasharray="7 4"/>
+      <text x="100" y="161" textAnchor="middle" fill={spinning?"rgba(255,170,0,.75)":"rgba(0,180,255,.65)"} fontFamily="Orbitron,monospace" fontSize="7.5" letterSpacing="3" fontWeight="600">{spinning?'AFTERBURNER':'IGNITE'}</text>
+      <text x="100" y="172" textAnchor="middle" fill={spinning?"rgba(255,130,0,.55)":"rgba(0,140,220,.45)"} fontFamily="Orbitron,monospace" fontSize="7" letterSpacing="2">{spinning?'ENGAGED':'AFTERBURNER'}</text>
+    </svg>
+  );
+};
+
+// ── MAIN APP ─────────────────────────────────────────────────────────────────
+const App = () => {
+  const [nodes,setNodes] = useState(INITIAL_NODES);
+  const [terminal,setTerminal] = useState([]);
+  const [prompt,setPrompt] = useState(null);
+  const [input,setInput] = useState('');
+  const [state,setState] = useState('connecting');
+  const [uptime,setUptime] = useState(0);
+  const [activeEdges,setActiveEdges] = useState({}); // {edgeId: color}
+  const ws = useRef(null);
+  const termEnd = useRef(null);
+
+  useEffect(()=>{const t=setInterval(()=>setUptime(u=>u+1),1000);return()=>clearInterval(t);},[]);
+  const fmt=s=>`${Math.floor(s/3600).toString().padStart(2,'0')}:${Math.floor((s%3600)/60).toString().padStart(2,'0')}:${(s%60).toString().padStart(2,'0')}`;
+
+  const addLine = t => setTerminal(p=>[...p,t]);
+  const upNode = (id,u) => setNodes(ns=>ns.map(n=>n.id===id?{...n,...u}:n));
+
+  // Activate an edge (show plane flying)
+  const activateEdge = (edgeId, color) => {
+    setActiveEdges(e=>({...e,[edgeId]:color}));
+  };
+  const deactivateEdge = (edgeId) => {
+    setActiveEdges(e=>{const n={...e};delete n[edgeId];return n;});
+  };
+
+  useEffect(()=>{termEnd.current?.scrollIntoView({behavior:'smooth'});},[terminal,prompt]);
+
+  useEffect(()=>{
+    ws.current = new WebSocket('ws://localhost:8000/ws');
+    ws.current.onopen=()=>setState('ready_to_start');
+    ws.current.onmessage=(ev)=>{
+      const d=JSON.parse(ev.data);
+      if(d.type==='log'){
+        addLine(d.message);
+        const m=d.message;
+        // Jira
+        if(m.includes('Jira Agent analyzing ticket')){upNode('jira',{status:'running'});activateEdge('j-d','#3B82F6');}
+        if(m.includes('TICKET REQUIREMENTS')){upNode('jira',{status:'completed'});deactivateEdge('j-d');}
+        // Doc
+        if(m.includes('DOCUMENTATION AGENT')){upNode('doc',{status:'running'});activateEdge('d-dr','#10B981');}
+        if(m.includes('Document saved:')){upNode('doc',{status:'completed'});deactivateEdge('d-dr');}
+        // Dremio
+        if(m.includes('DREMIO AGENT')){upNode('dremio',{status:'running'});activateEdge('dr-q','#F97316');}
+        if(m.includes('Validation FAILED')){upNode('dremio',{status:'error'});}
+        if(m.includes('Intercepting error')||m.includes('auto-fix')){upNode('dremio',{status:'healing'});}
+        if(m.includes('VDS created successfully')){upNode('dremio',{status:'completed'});deactivateEdge('dr-q');}
+        // Qlik
+        if(m.includes('QLIK AGENT')){upNode('qlik',{status:'running'});activateEdge('q-g','#22C55E');}
+        if(m.includes('separate JIRA ticket for Qlik')||m.includes('Select option')){activateEdge('q-j','#22C55E');}
+        if(m.includes('QLIK SENSE DASHBOARD READY')){upNode('qlik',{status:'completed'});deactivateEdge('q-g');deactivateEdge('q-j');}
+        // Jira called from Qlik — jira receives, activates j-q return
+        if(m.includes('Jira Agent analyzing ticket')&&nodes.find(n=>n.id==='qlik')?.status==='running'){
+          activateEdge('j-q','#3B82F6');
+        }
+        if(m.includes('Loading sprints')||m.includes('Select sprint number')){deactivateEdge('q-j');}
+        // Git
+        if(m.includes('GITHUB AGENT')||m.includes('Validating local codebase')){upNode('git',{status:'running'});activateEdge('q-g','#A855F7');}
+        if(m.includes('WORKFLOW COMPLETE')){upNode('git',{status:'completed'});setActiveEdges({});}
+      } else if(d.type==='prompt'){
+        setPrompt(d.message); setState('waiting_input');
+        if(d.message.includes('Select option')||d.message.includes('Select sprint')||d.message.includes('Select ticket'))
+          upNode('jira',{status:'waiting'});
+      } else if(d.type==='error'){
+        addLine(`[ERROR] ${d.message}`);
+      } else if(d.type==='done'){
+        setState('done');setActiveEdges({});
+      }
+    };
+    ws.current.onclose=()=>setState('disconnected');
+    return()=>ws.current.close();
+  },[]);
+
+  const handleSubmit=e=>{
+    e.preventDefault();if(!prompt||!input.trim())return;
+    addLine(`${prompt}${input}`);
+    ws.current.send(input);
+    setInput('');setPrompt(null);setState('processing');
+    setNodes(ns=>ns.map(n=>n.status==='waiting'?{...n,status:'pending'}:n));
+  };
+
+  const isSpinning=['processing','waiting_input'].includes(state);
+  const doneCnt=nodes.filter(n=>n.status==='completed').length;
+
+  // Canvas dimensions
+  const CANVAS_W = 1050;
+  const CANVAS_H = 1050;
+
+  return (
+    <div className="layout">
+
+      {/* ── LEFT CANVAS ── */}
+      <div className="canvas-panel bg-grid">
+        <div className="scan-lines"/>
+        <video autoPlay loop muted playsInline className="video-bg">
+          <source src="/image/asl_airlines_edited.mp4" type="video/mp4"/>
+        </video>
+
+        {/* Topbar */}
+        <div className="topbar">
+          <div style={{display:'flex',alignItems:'center',gap:16}}>
+            <img src="https://aslairlines.be/wp-content/uploads/2022/09/asl_belgium_white_logo.png" alt="ASL" style={{height:22,objectFit:'contain'}}/>
+            <div style={{width:1,height:22,background:'rgba(255,255,255,0.1)'}}/>
+            <div>
+              <div className="topbar-title">DATALAKE WORKFLOW ORCHESTRATOR</div>
+              <div className="topbar-sub">ADL PIPELINE — JIRA → DOC → DREMIO → QLIK</div>
+            </div>
+          </div>
+          <div style={{display:'flex',alignItems:'center',gap:14}}>
+            <div className="metric-pill"><div className="metric-label">UPTIME</div><div className="metric-val">{fmt(uptime)}</div></div>
+            <div className="metric-pill"><div className="metric-label">AGENTS</div><div className="metric-val" style={{color:doneCnt>0?'#10B981':'var(--accent)'}}>{doneCnt}/{INITIAL_NODES.length}</div></div>
+            <div style={{display:'flex',gap:5}}>
+              {[['disconnected','#EF4444'],['connecting','#F59E0B'],['ready_to_start','#10B981']].map(([s,c])=>{
+                const on=(s===state)||( s==='ready_to_start'&&['processing','waiting_input','done'].includes(state));
+                return <div key={s} className="led" style={{background:on?c:`${c}22`,boxShadow:on?`0 0 8px ${c}`:'none'}}/>;
+              })}
+            </div>
+            <button className="restart-btn" onClick={()=>window.location.reload()}>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+              RESTART
+            </button>
+          </div>
+        </div>
+
+        {/* Agent Canvas */}
+        <div className="agent-canvas">
+          <div className="canvas-inner" style={{width:CANVAS_W,height:CANVAS_H,position:'relative'}}>
+
+            {/* Edge SVG layer */}
+            <svg className="edge-svg" viewBox={`0 0 ${CANVAS_W} ${CANVAS_H}`} width={CANVAS_W} height={CANVAS_H}>
+              {ALL_EDGES.map(edge=>{
+                const src=nodes.find(n=>n.id===edge.src);
+                const tgt=nodes.find(n=>n.id===edge.tgt);
+                const ac=activeEdges[edge.id];
+                // Calculate path
+                const RH=160;// robot height to bottom spike
+                const sx=src.x+ROBOT_W/2, sy=src.y+RH;
+                const ex=tgt.x+ROBOT_W/2, ey=tgt.y;
+
+                let path;
+                if(edge.curved){
+                  // qlik -> jira: sweep out right then up
+                  const qx=src.x+ROBOT_W, qy=src.y+80;
+                  const jx=tgt.x+ROBOT_W, jy=tgt.y+80;
+                  path=`M ${qx} ${qy} C ${qx+160} ${qy}, ${jx+160} ${jy}, ${jx} ${jy}`;
+                } else if(edge.curved2){
+                  // jira -> qlik: sweep right down
+                  const jx2=src.x+ROBOT_W/2+30, jy2=src.y+120;
+                  const qx2=tgt.x+ROBOT_W/2, qy2=tgt.y+40;
+                  path=`M ${jx2} ${jy2} C ${jx2+160} ${jy2+60}, ${qx2+100} ${qy2-80}, ${qx2} ${qy2}`;
+                } else if(Math.abs(src.x-tgt.x)<10){
+                  // vertical
+                  path=`M ${sx} ${sy} L ${ex} ${ey}`;
+                } else {
+                  // horizontal step (dremio->qlik)
+                  const midY=(sy+ey)/2;
+                  path=`M ${sx} ${sy} L ${sx} ${midY} L ${ex} ${midY} L ${ex} ${ey}`;
+                }
+
+                return (
+                  <g key={edge.id}>
+                    {/* Base connector */}
+                    <path d={path} stroke="rgba(255,255,255,0.11)" strokeWidth="1.5" fill="none" strokeDasharray={ac?"none":"5 5"}/>
+                    {ac && <>
+                      {/* Glowing path */}
+                      <path d={path} stroke={ac} strokeWidth="2" fill="none" opacity="0.55" style={{filter:`drop-shadow(0 0 5px ${ac})`}}/>
+                      {/* Flying aircraft using animateMotion */}
+                      <g>
+                        <animateMotion dur="2s" repeatCount="indefinite" path={path} rotate="auto"/>
+                        {/* Mini airplane shape */}
+                        <g transform="translate(-10,-6)">
+                          <ellipse cx="10" cy="6" rx="9" ry="3" fill={ac} opacity="0.95"/>
+                          <polygon points="18,6 22,6 19,4 19,8" fill={ac}/>
+                          <polygon points="10,6 6,1 14,4" fill={ac} opacity="0.85"/>
+                          <polygon points="10,6 6,11 14,8" fill={ac} opacity="0.85"/>
+                          <ellipse cx="1" cy="6" rx="4" ry="2" fill={ac} opacity="0.5" style={{filter:`blur(2px)`}}/>
+                        </g>
+                      </g>
+                    </>}
+                  </g>
+                );
+              })}
+            </svg>
+
+            {/* Agent nodes */}
+            {nodes.map(n=><AgentNode key={n.id} node={n}/>)}
+          </div>
+        </div>
+
+        {/* Statusbar */}
+        <div className="statusbar">
+          <div className="status-label">
+            <motion.div className="status-dot" style={{background:isSpinning?'#F97316':state==='ready_to_start'?'#10B981':'#374151'}}
+              animate={isSpinning?{opacity:[1,.2,1]}:{}} transition={{duration:.4,repeat:Infinity}}/>
+            {isSpinning?'PIPELINE EXECUTING':state==='ready_to_start'?'READY — AWAITING IGNITION':state==='done'?'WORKFLOW COMPLETE':state.toUpperCase()}
+          </div>
+          <div className="status-label" style={{marginLeft:'auto'}}>DnT INFOTECH × ASL AVIATION GROUP</div>
+        </div>
+      </div>
+
+      {/* ── RIGHT PANEL ── */}
+      <div className="right-panel">
+
+        {/* Turbine */}
+        <div className="turbine-section">
+          <div className="engine-label">ENGINE CONTROL UNIT</div>
+          <motion.button className="engine-btn"
+            onClick={()=>{if(state==='ready_to_start'){ws.current.send("START_WORKFLOW");setState("processing");}}}
+            disabled={state!=='ready_to_start'}
+            whileHover={state==='ready_to_start'?{scale:1.05}:{}}
+            animate={isSpinning?{x:[-1,1,-1,1,0],y:[-1,1,-1,1,0]}:{}}
+            transition={isSpinning?{duration:.1,repeat:Infinity}:{}}
+            style={{
+              borderRadius:'50%',padding:6,
+              background:isSpinning?'radial-gradient(circle,rgba(255,80,0,.15) 0%,transparent 70%)':'radial-gradient(circle,rgba(0,80,160,.15) 0%,transparent 70%)',
+              boxShadow:isSpinning?'0 0 55px rgba(255,100,0,.28)':state==='ready_to_start'?'0 0 35px rgba(0,180,255,.18)':'none',
+              opacity:state!=='ready_to_start'&&!isSpinning?.4:1,
+            }}>
+            <TurbineSVG spinning={isSpinning} idle={state==='ready_to_start'}/>
+          </motion.button>
+
+          {isSpinning && <motion.div style={{width:65,height:22,background:'radial-gradient(ellipse,rgba(255,115,0,.48) 0%,transparent 70%)',filter:'blur(5px)',marginTop:-6}}
+            animate={{opacity:[.5,1,.5],scaleY:[1,1.5,1]}} transition={{duration:.15,repeat:Infinity}}/>}
+
+          <div className="status-readout">
+            <motion.div className="status-dot-lg"
+              style={{background:isSpinning?'#F97316':state==='ready_to_start'?'var(--accent)':'#374151'}}
+              animate={isSpinning?{opacity:[1,.2,1]}:state==='ready_to_start'?{opacity:[1,.5,1]}:{}}
+              transition={{duration:isSpinning?.3:2,repeat:Infinity}}/>
+            <span className="status-text" style={{color:isSpinning?'#F97316':state==='ready_to_start'?'var(--accent)':'#374151'}}>
+              {isSpinning?'AFTERBURNER ENGAGED':state==='ready_to_start'?'TURBINE STANDBY':state==='done'?'CYCLE COMPLETE':'OFFLINE'}
+            </span>
+          </div>
+          <div className="rpm-bars">
+            {Array.from({length:20}).map((_,i)=>(
+              <motion.div key={i} className="rpm-bar"
+                style={{background:isSpinning?(i<10?'#10B981':i<15?'#F59E0B':'#EF4444'):(i<3?'var(--accent)':'rgba(255,255,255,0.06)')}}
+                animate={isSpinning&&i>=13?{opacity:[1,.3,1]}:{}} transition={{duration:.1+i*.02,repeat:Infinity}}/>
+            ))}
+          </div>
+        </div>
+
+        {/* Terminal header */}
+        <div className="term-header">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+          <span className="term-title">EXECUTIVE EVENT LOG</span>
+          <span style={{marginLeft:'auto',fontFamily:"'Share Tech Mono',monospace",fontSize:10,color:'rgba(0,180,255,.32)'}}>{terminal.length} LINES</span>
+        </div>
+
+        {/* Terminal body */}
+        <div className="term-body">
+          {terminal.length===0 && (
+            <div className="term-empty">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+              <div className="term-empty-label">AWAITING PIPELINE ACTIVATION</div>
+            </div>
+          )}
+          {terminal.map((line,i)=>{
+            const isSep=line.startsWith('===');
+            const isHdr=line.includes('AGENT')||line.includes('WORKFLOW')||line.includes('ASL AIRLINES');
+            return <div key={i} className={`term-line${isSep?' sep':isHdr?' hdr':''}`}>{!isSep&&!isHdr&&<span style={{color:'rgba(0,180,255,.28)',marginRight:5}}>›</span>}{line}</div>;
+          })}
+          {prompt && (
+            <motion.div initial={{opacity:0,y:6}} animate={{opacity:1,y:0}} className="prompt-block">
+              <span className="prompt-text">{prompt}</span>
+              <form className="prompt-form" onSubmit={handleSubmit}>
+                <input autoFocus className="prompt-input" value={input} onChange={e=>setInput(e.target.value)} placeholder="input..."/>
+                <div className="cursor-blink"/>
+              </form>
+            </motion.div>
+          )}
+          <div ref={termEnd}/>
+        </div>
+
+        <div className="term-footer">
+          <span className="footer-label">DnT INFOTECH</span>
+          <span className="footer-label">v4.0 · ADL PIPELINE</span>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>
