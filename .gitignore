@@ -1,17 +1,19 @@
-# Environments
+# ── Secrets / environment ─────────────────────────────────────────────────────
+# Real credentials live in these files — never commit them.
 .env
 *.env
 config.env
-.venv
+!config.env.example
+!*.env.example
+
+# ── Virtual environments ──────────────────────────────────────────────────────
+.venv/
 venv/
 ENV/
 env.bak/
 venv.bak/
 
-# Antigravity CLI
-.antigravitycli/
-
-# Python
+# ── Python ────────────────────────────────────────────────────────────────────
 __pycache__/
 *.py[cod]
 *$py.class
@@ -34,6 +36,34 @@ share/python-wheels/
 .installed.cfg
 *.egg
 
-# OS
+# ── Runtime artifacts ─────────────────────────────────────────────────────────
+approval_store/
+lg_audit.jsonl
+generated_queries/
+Project Documentation/
+pyright_errors*.txt
+
+# ── Large generated reference data (Dremio catalog) ───────────────────────────
+# Multi-MB generated files; placed at the project root (or CATALOG_DIR) at runtime.
+catalog_data.json
+excel_master.json
+
+# ── Tooling ───────────────────────────────────────────────────────────────────
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# ── IDE / editor ──────────────────────────────────────────────────────────────
+.idea/
+.vscode/
+.antigravitycli/
+
+# ── OS ────────────────────────────────────────────────────────────────────────
 .DS_Store
 Thumbs.db
+
+# ── Claude Code ───────────────────────────────────────────────────────────────
+# Keep shared project settings; ignore personal/local overrides.
+.claude/settings.local.json
