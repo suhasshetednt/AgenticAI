@@ -115,6 +115,8 @@
         /* ── NEO GLOW behind robot ── */
         @keyframes neo-pulse { 0%,100%{opacity:.5;transform:scale(1)} 50%{opacity:1;transform:scale(1.06)} }
         @keyframes neo-ring  { 0%{transform:scale(1);opacity:.6} 100%{transform:scale(2.2);opacity:0} }
+        /* In-progress aura: a brighter blink in the agent's own colour */
+        @keyframes aura-blink { 0%,100%{opacity:.30;transform:translate(-50%,-60%) scale(.96)} 50%{opacity:1;transform:translate(-50%,-60%) scale(1.12)} }
     </style>
 </head>
 <body>
@@ -151,11 +153,19 @@ const NODES_INIT = [
 // The "active" object holds: { edgeId, fromId, toId, color }
 // Only ONE edge can carry a plane at a time per pair. Direction flips as needed.
 const EDGE_DEFS = [
+    // ── Primary delivery flow (named edges drive the hand-off plane animation) ──
     {id:'j-d',  a:'jira',  b:'doc',    type:'vert'},
     {id:'d-dr', a:'doc',   b:'dremio', type:'vert'},
     {id:'dr-q', a:'dremio',b:'qlik',   type:'horiz'},
     {id:'q-g',  a:'qlik',  b:'git',    type:'vert'},
     {id:'q-j',  a:'qlik',  b:'jira',   type:'curve'},  // shared line for qlik↔jira
+    // ── Mesh links — one single link between every remaining agent pair so that
+    //    any agent can hand off to any other (drawn dimmer than the main flow). ──
+    {id:'j-dr', a:'jira',  b:'dremio', type:'link'},
+    {id:'j-g',  a:'jira',  b:'git',    type:'link'},
+    {id:'d-q',  a:'doc',   b:'qlik',   type:'link'},
+    {id:'d-g',  a:'doc',   b:'git',    type:'link'},
+    {id:'dr-g', a:'dremio',b:'git',    type:'link'},
 ];
 
 // ─── TURBINE ─────────────────────────────────────────────────────────────────
@@ -236,6 +246,19 @@ const getEdgePath = (edge, nodesMap) => {
         const cx2=bx+190, cy2=by;
         return `M${ax} ${ay} C${cx1} ${cy1},${cx2} ${cy2},${bx} ${by}`;
     }
+    if(edge.type==='link'){
+        // Generic mesh link: centre-to-centre with a perpendicular bow so the
+        // line (and any plane flying along it) curves around the node boxes.
+        const ax=A.x+NW/2, ay=A.y+NH/2;
+        const bx=B.x+NW/2, by=B.y+NH/2;
+        const mx=(ax+bx)/2, my=(ay+by)/2;
+        const dx=bx-ax, dy=by-ay;
+        const len=Math.hypot(dx,dy)||1;
+        const bow=Math.min(90, len*0.18);
+        const nx=-dy/len, ny=dx/len;          // unit perpendicular
+        const cx=mx+nx*bow, cy=my+ny*bow;
+        return `M${ax} ${ay} Q${cx} ${cy} ${bx} ${by}`;
+    }
     return '';
 };
 
@@ -268,11 +291,15 @@ const Edge = ({edge, nodesMap, activePlane}) => {
     // Build reversed path string by swapping M endpoint and reversing bezier
     const planePath = planeReversed ? reversePath(path, edge, nodesMap) : path;
     const planeColor = isActive ? activePlane.color : '#3B82F6';
+    const isMesh = edge.type==='link';
 
     return (
         <g>
-            {/* Static base line — always shown */}
-            <path d={path} stroke="rgba(255,255,255,0.13)" strokeWidth="1.8" fill="none" strokeDasharray={isActive?"none":"6 5"}/>
+            {/* Static base line — always shown; mesh links are dimmer */}
+            <path d={path}
+                stroke={isMesh ? "rgba(255,255,255,0.06)" : "rgba(255,255,255,0.13)"}
+                strokeWidth={isMesh ? 1.2 : 1.8} fill="none"
+                strokeDasharray={isActive?"none":(isMesh?"3 7":"6 5")}/>
             {/* Glow when active */}
             {isActive && <path d={path} stroke={planeColor} strokeWidth="2" fill="none" opacity=".45"
                 style={{filter:`drop-shadow(0 0 5px ${planeColor})`}}/>}
@@ -311,6 +338,18 @@ const reversePath = (path, edge, nodesMap) => {
         const cx2=bx+170, cy2=by;
         return `M${ax} ${ay} C${cx1} ${cy1},${cx2} ${cy2},${bx} ${by}`;
     }
+    if(edge.type==='link'){
+        // reverse a mesh link: fly from B back to A along the same bowed curve
+        const ax=B.x+NW/2, ay=B.y+NH/2;
+        const bx=A.x+NW/2, by=A.y+NH/2;
+        const mx=(ax+bx)/2, my=(ay+by)/2;
+        const dx=bx-ax, dy=by-ay;
+        const len=Math.hypot(dx,dy)||1;
+        const bow=Math.min(90, len*0.18);
+        const nx=-dy/len, ny=dx/len;
+        const cx=mx-nx*bow, cy=my-ny*bow;     // mirror the bow to trace the same arc
+        return `M${ax} ${ay} Q${cx} ${cy} ${bx} ${by}`;
+    }
     return path;
 };
 
@@ -327,23 +366,36 @@ const AgentRobot = ({node}) => {
     return (
         <div style={{position:'relative', display:'flex', flexDirection:'column', alignItems:'center', width:128}}>
 
-            {/* ── NEO GLOW (behind robot, only when running/done) ── */}
-            {(isRunning||isDone) && (
+            {/* ── NEO GLOW (behind robot) ──
+                 Running  → a bright aura that BLINKS in the agent's own colour
+                 Healing  → same blinking aura in amber (auto-fix in progress)
+                 Done     → a soft steady glow (no blink) */}
+            {(isRunning||isHealing||isDone) && (
                 <div style={{
                     position:'absolute', top:'50%', left:'50%',
                     transform:'translate(-50%,-60%)',
-                    width: isRunning?260:200, height: isRunning?260:200,
+                    width: (isRunning||isHealing)?280:200, height: (isRunning||isHealing)?280:200,
                     borderRadius:'50%',
-                    background:`radial-gradient(circle, ${node.color}${isRunning?'55':'28'} 0%, transparent 68%)`,
+                    background:`radial-gradient(circle, ${pc}${(isRunning||isHealing)?'66':'24'} 0%, ${pc}22 38%, transparent 70%)`,
                     pointerEvents:'none', zIndex:0,
-                    animation: isRunning?'neo-pulse 2s ease-in-out infinite':'none',
+                    // The blinking aura that signals "in progress"
+                    animation: (isRunning||isHealing)?'aura-blink 1.2s ease-in-out infinite':'none',
                 }}>
-                    {isRunning && (
-                        <div style={{
-                            position:'absolute', inset:0, borderRadius:'50%',
-                            border:`2px solid ${node.color}60`,
-                            animation:'neo-ring 2s ease-out infinite',
-                        }}/>
+                    {(isRunning||isHealing) && (
+                        <React.Fragment>
+                            {/* expanding pulse rings in the agent colour */}
+                            <div style={{
+                                position:'absolute', inset:0, borderRadius:'50%',
+                                border:`2px solid ${pc}`,
+                                animation:'neo-ring 2s ease-out infinite',
+                            }}/>
+                            <div style={{
+                                position:'absolute', inset:0, borderRadius:'50%',
+                                border:`2px solid ${pc}aa`,
+                                animation:'neo-ring 2s ease-out infinite',
+                                animationDelay:'1s',
+                            }}/>
+                        </React.Fragment>
                     )}
                 </div>
             )}

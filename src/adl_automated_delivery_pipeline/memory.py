@@ -205,6 +205,53 @@ class MemoryManager:
 
     # ── Outcomes log ──────────────────────────────────────────────────
 
+    def store_error_fix(
+        self,
+        *,
+        error: str,
+        fix: str,
+        context: str = "",
+        session_id: str = "workflow",
+    ) -> None:
+        """Record an auto-fix: the error encountered and the fix that was applied.
+
+        Routes to the centralized Memory Platform as an ``error`` memory so future
+        runs can recall the resolution; falls back to the local JSONL outcomes log
+        when the platform is unavailable.
+
+        Args:
+            error: The error message / failure that was intercepted.
+            fix: A description of the fix that was applied.
+            context: Where the error happened (e.g. "Dremio VDS creation").
+            session_id: The session the error belongs to.
+        """
+        payload = {
+            "kind": "error_fix",
+            "error": error,
+            "fix": fix,
+            "context": context,
+            "session_id": session_id,
+            "recorded_at": datetime.now(timezone.utc).isoformat(),
+        }
+        # Primary: centralized Memory Platform (cross-session, searchable).
+        memory_id = self._memory.remember(
+            type="error",
+            content=f"CONTEXT: {context}\nERROR: {error}\nFIX: {fix}",
+            scope="agent",
+            payload=payload,
+            idempotency_key=f"{session_id}:errorfix:{abs(hash(error)) & 0xFFFFFFFF:x}",
+        )
+        if memory_id is not None:
+            logger.debug("Error+fix stored to memory platform: %s", memory_id)
+            return
+        # Fallback (platform disabled/unreachable): append to the local outcomes log.
+        try:
+            with self._outcomes_path.open("a", encoding="utf-8") as fh:
+                fh.write(json.dumps(payload, default=str) + "\n")
+            logger.debug("Error+fix stored to local jsonl fallback.")
+        except OSError as exc:
+            logger.error("Failed to store error+fix: %s", exc)
+
     def store_outcome(self, session_id: str, outcome: dict) -> None:
         """Append a session outcome record to the outcomes JSONL log.
 

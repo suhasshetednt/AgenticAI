@@ -48,6 +48,42 @@ _DIV        = "=" * 62
 _OUTPUT_DIR = Path(__file__).resolve().parent.parent.parent.parent / "generated_queries"
 
 
+# ── Self-healing memory ──────────────────────────────────────────────────────────
+
+_MEMORY: Any = None
+
+
+def _memory_mgr() -> Any:
+    """Lazily build the shared MemoryManager (best-effort; ``None`` if unavailable)."""
+    global _MEMORY
+    if _MEMORY is None:
+        try:
+            from adl_automated_delivery_pipeline.memory import MemoryManager
+            _MEMORY = MemoryManager()
+        except Exception as exc:  # noqa: BLE001 - memory is best-effort
+            logger.warning("Memory backend unavailable: %s", exc)
+            _MEMORY = False  # sentinel: tried and failed
+    return _MEMORY or None
+
+
+def _record_autofix(error: str, fix: str, context: str = "") -> None:
+    """Announce an auto-fix and persist the error + fix to memory.
+
+    The printed ``auto-fix`` token is what flips the matching agent into the
+    blinking "healing" state on the live dashboard, so keep it in the message.
+    """
+    print(f"  [auto-fix] {context or 'error intercepted'} — applying fix and saving to memory ...")
+    mgr = _memory_mgr()
+    if mgr is None:
+        print("  [memory] backend unavailable — fix not persisted.")
+        return
+    try:
+        mgr.store_error_fix(error=error, fix=fix, context=context)
+        print("  [memory] error + fix saved for future runs.")
+    except Exception as exc:  # noqa: BLE001 - never let memory break the workflow
+        logger.warning("Could not store error+fix: %s", exc)
+
+
 # ── Console helpers ─────────────────────────────────────────────────────────────
 
 def _inp(prompt: str, required: bool = True) -> str:
@@ -185,6 +221,91 @@ def _fetch_ticket(ticket_id: str) -> dict[str, Any]:
         return {"status": "FAILED", "error": e.text}
     except Exception as e:
         return {"status": "FAILED", "error": str(e)}
+
+
+# ── Project selection ────────────────────────────────────────────────────────────
+
+# Friendly fallback when Jira can't be reached (offline / auth issue). The board id
+# is only a hint — at runtime we discover the real board for the chosen project.
+_KNOWN_PROJECTS: dict[str, int] = {"ADL": 2}
+
+
+def _discover_projects() -> list[dict[str, Any]]:
+    """Return the Jira projects the user can work on as ``[{key, name}]``.
+
+    Falls back to the known-projects map when the Jira API is unavailable.
+    """
+    try:
+        projects = _jira().projects()
+        out = [{"key": p.key, "name": getattr(p, "name", p.key)} for p in projects]
+        out.sort(key=lambda p: p["key"])
+        if out:
+            return out
+    except Exception as exc:  # noqa: BLE001 - graceful offline degradation
+        logger.warning("Could not list Jira projects: %s", exc)
+    return [{"key": k, "name": k} for k in _KNOWN_PROJECTS]
+
+
+def _resolve_board_id(project_key: str) -> int:
+    """Find the agile board id for *project_key* that actually carries sprints.
+
+    Priority:
+      1. The confirmed board id from ``_KNOWN_PROJECTS`` (e.g. ADL -> board 2).
+      2. The first *scrum* board (Kanban boards have no sprints).
+      3. The first board of any type.
+    """
+    # Confirmed board ids win — they are known to hold the active sprint.
+    known = _KNOWN_PROJECTS.get(project_key)
+    if known:
+        return known
+    try:
+        boards = _jira().boards(projectKeyOrID=project_key)
+        if boards:
+            scrum = [b for b in boards if getattr(b, "type", "").lower() == "scrum"]
+            chosen = scrum[0] if scrum else boards[0]
+            return int(chosen.id)
+    except Exception as exc:  # noqa: BLE001 - graceful offline degradation
+        logger.warning("Could not resolve board for %s: %s", project_key, exc)
+    return 0
+
+
+def _pick_project() -> bool:
+    """Let the user choose which Jira project to work on.
+
+    Updates the module-level ``PROJECT`` and ``_BOARD_ID`` globals so every
+    downstream helper (sprint/backlog/JQL) targets the chosen project. Returns
+    ``False`` if the user cancels.
+    """
+    global PROJECT, _BOARD_ID
+
+    _header("SELECT PROJECT")
+    print("  Loading projects ...")
+    projects = _discover_projects()
+
+    proj_map: dict[str, dict[str, Any]] = {}
+    for idx, p in enumerate(projects, start=1):
+        proj_map[str(idx)] = p
+        marker = "   (default)" if p["key"] == PROJECT else ""
+        print(f"  [{idx}] {p['key']:<10} {p['name']}{marker}")
+    print("  [0] Cancel")
+    print(_DIV)
+
+    while True:
+        raw = _inp(f"Select project number (Enter for {PROJECT}): ", required=False)
+        if raw == "":
+            chosen = next((p for p in projects if p["key"] == PROJECT), projects[0])
+            break
+        if raw == "0":
+            return False
+        if raw in proj_map:
+            chosen = proj_map[raw]
+            break
+        print("  Invalid selection — please try again.")
+
+    PROJECT = chosen["key"]
+    _BOARD_ID = _resolve_board_id(PROJECT)
+    print(f"\n  Project set to {PROJECT}  (board id {_BOARD_ID}).")
+    return True
 
 
 # ── Sprint selection ─────────────────────────────────────────────────────────────
@@ -1011,13 +1132,25 @@ def _dremio_phase(reqs: TicketRequirements | None) -> str:
                             raise
 
                 result = {"agent_output": raw_sql}
+                _pre_fix_sql = _strip_fences(raw_sql.strip())
                 sql = _fix_dremio_sql(
                     _fix_reserved_keywords(
                         _remove_semicolons(
-                            _strip_fences(raw_sql.strip())
+                            _pre_fix_sql
                         )
                     )
                 )
+
+                # If the deterministic Calcite-dialect repairs actually changed the
+                # SQL, that is an auto-fix worth remembering for future runs.
+                if sql and _pre_fix_sql and sql.strip() != _pre_fix_sql.strip():
+                    _record_autofix(
+                        error="Generated SQL was not valid Dremio/Calcite dialect "
+                              "(semicolons / reserved words / unsupported constructs).",
+                        fix="Applied automatic Calcite-dialect fix-ups "
+                            "(_fix_dremio_sql / _fix_reserved_keywords / _remove_semicolons).",
+                        context="Dremio SQL generation",
+                    )
 
                 if not sql:
                     print("\n  Agent returned empty SQL — retrying automatically ...\n")
@@ -1140,6 +1273,12 @@ def _dremio_phase(reqs: TicketRequirements | None) -> str:
                                         err_msg = cres.get("error")
                                         sep = "\n" if reqs.extra_notes else ""
                                         reqs.extra_notes += f"{sep}[Attempt {attempt} API Error]: {err_msg}. Please fix this SQL error."
+                                        _record_autofix(
+                                            error=f"Dremio VDS creation failed (attempt {attempt}): {err_msg}",
+                                            fix="Fed the Dremio error back into the prompt and "
+                                                "auto-regenerated the SQL.",
+                                            context="Dremio VDS creation",
+                                        )
                                         print("  Error noted. Regenerating ...\n")
                                         regenerate = True
                                         break
@@ -1562,8 +1701,13 @@ def main() -> None:
         if candidate.exists():
             load_dotenv(candidate, override=False)
 
+    # ── Choose the Jira project to work on (default: ADL) ─────────────────────
+    if not _pick_project():
+        print("  Bye.")
+        return
+
     print(f"\n{_DIV}")
-    print("  ASL AIRLINES  --  ADL WORKFLOW  |  JIRA -> DOC -> DREMIO -> QLIK")
+    print(f"  ASL AIRLINES  --  {PROJECT} WORKFLOW  |  JIRA -> DOC -> DREMIO -> QLIK")
     print(_DIV)
     print("  [1]  Work on an existing ticket  (browse sprint)")
     print("  [2]  Browse backlog tickets")

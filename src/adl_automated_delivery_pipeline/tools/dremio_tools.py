@@ -19,7 +19,9 @@ from langchain_core.tools import tool
 logger = logging.getLogger(__name__)
 
 _DEFAULT_ROW_LIMIT = 100
-_SQL_TIMEOUT_SECONDS = 120
+# Hard cap on how long execute_dremio_sql polls a Dremio job before giving up.
+# Configurable via env for environments with slow engines / heavy queries.
+_SQL_TIMEOUT_SECONDS = int(os.getenv("DREMIO_SQL_TIMEOUT_S", "120"))
 _JOB_POLL_INTERVAL = 2
 
 
@@ -163,20 +165,24 @@ def execute_dremio_sql(sql: str, context: str = "") -> dict:
 
 @tool
 def validate_sql_query(sql: str) -> dict:
-    """Validate SQL syntax and infer output schema without fetching data rows.
+    """Validate SQL syntax and column references without executing the query.
 
-    Uses LIMIT 0 — fast and safe.
+    Uses ``EXPLAIN PLAN FOR`` — Dremio binds the query (checking syntax and that
+    every referenced column resolves) but does NOT execute it or scan source data,
+    so validation stays fast even against federated sources. (The previous
+    ``SELECT * (...) LIMIT 0`` wrapper was not reliably short-circuited by Dremio
+    and could time out running a full scan.)
 
     Args:
         sql: SQL to validate.
 
     Returns:
-        Dict with status, message, and inferred schema columns.
+        Dict with status and message; on failure, the underlying error dict.
     """
-    wrapped = f"SELECT * FROM (\n{sql}\n) __validation__ LIMIT 0"
-    result = execute_dremio_sql.invoke({"sql": wrapped})  # type: ignore[attr-defined]
+    explain = f"EXPLAIN PLAN FOR\n{sql}"
+    result = execute_dremio_sql.invoke({"sql": explain})  # type: ignore[attr-defined]
     if result["status"] == "SUCCESS":
-        return {"status": "SUCCESS", "message": "Query is valid", "schema": result.get("schema", [])}
+        return {"status": "SUCCESS", "message": "Query is valid"}
     return result
 
 
