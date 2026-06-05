@@ -91,3 +91,14 @@ def test_docx_renderer_maps_markdown_to_docx_model(tmp_path: Path) -> None:
     assert doc.tables[0].rows[0].cells[0].text == "Risk"
     assert doc.tables[0].rows[1].cells[1].text == "Validate with EXPLAIN"
     assert len(doc.tables[0].rows) == 3
+
+
+@pytest.mark.unit
+def test_docx_renderer_nested_bullets_all_stay_bullets(tmp_path: Path) -> None:
+    r = renderers_base.get_renderer("docx")
+    out = r.render("- Before\n  - Nested\n- After\n", tmp_path / "n.docx", DocContext(title="t"))
+    doc = _Doc(str(out))
+    bullets = [p.text for p in doc.paragraphs if p.style.name == "List Bullet"]
+    assert "Before" in bullets
+    assert "Nested" in bullets
+    assert "After" in bullets  # before the fix this rendered as a Normal paragraph

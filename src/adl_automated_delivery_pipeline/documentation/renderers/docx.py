@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 from typing import Any
 
@@ -11,6 +12,8 @@ from markdown_it.token import Token
 
 from adl_automated_delivery_pipeline.documentation import brand
 from adl_automated_delivery_pipeline.documentation.context import DocContext
+
+logger = logging.getLogger(__name__)
 
 _MD = MarkdownIt("commonmark").enable("table")
 
@@ -40,7 +43,7 @@ def _parse_table(tokens: list[Token], start: int) -> tuple[list[str], list[list[
         elif ttype in ("th_open", "td_open"):
             text = _inline_text(tokens[j + 1])
             (headers if ttype == "th_open" else current).append(text)
-            j += 2  # skip the inline + its close (loop adds the final +1)
+            j += 2  # advance past the inline child; the loop's j += 1 then skips the close tag
         j += 1
     return headers, rows, j + 1
 
@@ -58,12 +61,19 @@ def _render_tokens(doc: Any, tokens: list[Token]) -> None:
             brand.add_paragraph(doc, _inline_text(tokens[i + 1]))
             i += 3
         elif ttype == "bullet_list_open":
+            # Track nesting depth so a nested sub-list's close does not end the
+            # outer list early. Nested items are flattened to bullets.
+            depth = 1
             i += 1
-            while tokens[i].type != "bullet_list_close":
-                if tokens[i].type == "inline":
+            while depth > 0:
+                inner = tokens[i].type
+                if inner == "bullet_list_open":
+                    depth += 1
+                elif inner == "bullet_list_close":
+                    depth -= 1
+                elif inner == "inline":
                     brand.add_bullet(doc, _inline_text(tokens[i]))
                 i += 1
-            i += 1
         elif ttype == "table_open":
             headers, rows, i = _parse_table(tokens, i)
             brand.add_table(doc, headers, rows)
@@ -78,6 +88,7 @@ class DocxRenderer:
     extension = "docx"
 
     def render(self, markdown: str, out_path: Path, context: DocContext) -> Path:
+        # `context` is part of the Renderer protocol and reserved for future metadata use.
         out_path = out_path.with_suffix(".docx")
         out_path.parent.mkdir(parents=True, exist_ok=True)
         doc = Document()
