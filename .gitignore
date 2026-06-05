@@ -67,3 +67,4 @@ Thumbs.db
 # ── Claude Code ───────────────────────────────────────────────────────────────
 # Keep shared project settings; ignore personal/local overrides.
 .claude/settings.local.json
+.superpowers/
