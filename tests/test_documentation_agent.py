@@ -53,3 +53,15 @@ def test_generate_unknown_format_raises(tmp_path: Path) -> None:
             out_dir=tmp_path,
             filler="stub",
         )
+
+
+@pytest.mark.unit
+def test_default_tid_template_loads_and_has_core_sections() -> None:
+    from adl_automated_delivery_pipeline.documentation.template import Template
+
+    tpl = Template.load("technical_implementation_document")
+    headings = {s.heading for s in tpl.sections}
+    # headings are numbered (e.g. "6. Risks & Mitigation"), so match by substring
+    for expected in ("Risks & Mitigation", "Data Dictionary", "Sign-off"):
+        assert any(expected in h for h in headings), f"missing section containing {expected!r}"
+    assert "title" in tpl.required_keys()
