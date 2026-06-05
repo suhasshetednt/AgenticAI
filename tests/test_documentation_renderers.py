@@ -25,3 +25,27 @@ def test_add_table_builds_header_plus_rows_and_pads_short_rows() -> None:
     assert len(table.rows) == 3            # header + 2 data rows
     assert table.rows[0].cells[0].text == "A"
     assert table.rows[2].cells[1].text == ""  # short row padded
+
+
+from pathlib import Path
+
+from adl_automated_delivery_pipeline.documentation.context import DocContext
+from adl_automated_delivery_pipeline.documentation.renderers import (
+    base as renderers_base,
+)
+from adl_automated_delivery_pipeline.documentation import renderers  # noqa: F401  (registers md/docx)
+
+
+@pytest.mark.unit
+def test_get_renderer_unknown_format_lists_registered() -> None:
+    with pytest.raises(ValueError) as exc:
+        renderers_base.get_renderer("xml")
+    assert "md" in str(exc.value)
+
+
+@pytest.mark.unit
+def test_markdown_renderer_writes_file_verbatim(tmp_path: Path) -> None:
+    r = renderers_base.get_renderer("md")
+    out = r.render("# Hello\n\nBody", tmp_path / "doc.md", DocContext(title="x"))
+    assert out.read_text(encoding="utf-8") == "# Hello\n\nBody"
+    assert out.suffix == ".md"
