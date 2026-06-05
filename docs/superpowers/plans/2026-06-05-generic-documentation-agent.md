@@ -1427,8 +1427,9 @@ def test_default_tid_template_loads_and_has_core_sections() -> None:
 
     tpl = Template.load("technical_implementation_document")
     headings = {s.heading for s in tpl.sections}
+    # headings are numbered (e.g. "6. Risks & Mitigation"), so match by substring
     for expected in ("Risks & Mitigation", "Data Dictionary", "Sign-off"):
-        assert expected in headings
+        assert any(expected in h for h in headings), f"missing section containing {expected!r}"
     assert "title" in tpl.required_keys()
 ```
 
