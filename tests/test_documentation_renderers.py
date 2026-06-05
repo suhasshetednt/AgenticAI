@@ -1,0 +1,27 @@
+"""Unit tests for brand helpers and renderers (assert on the docx object model)."""
+
+from __future__ import annotations
+
+import pytest
+from docx import Document
+
+from adl_automated_delivery_pipeline.documentation import brand
+
+
+@pytest.mark.unit
+def test_add_heading_sets_navy_for_level1() -> None:
+    doc = Document()
+    brand.add_heading(doc, "Section", level=1)
+    para = doc.paragraphs[-1]
+    assert para.runs[0].text == "Section"
+    assert para.runs[0].font.color.rgb == brand.COLOR_NAVY
+
+
+@pytest.mark.unit
+def test_add_table_builds_header_plus_rows_and_pads_short_rows() -> None:
+    doc = Document()
+    brand.add_table(doc, ["A", "B"], [["1", "2"], ["3"]])
+    table = doc.tables[-1]
+    assert len(table.rows) == 3            # header + 2 data rows
+    assert table.rows[0].cells[0].text == "A"
+    assert table.rows[2].cells[1].text == ""  # short row padded
