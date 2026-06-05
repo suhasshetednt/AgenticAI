@@ -20,6 +20,7 @@ dependencies = [
     "anthropic>=0.105",
     "jira>=3.10",
     "python-docx>=1.2",
+    "markdown-it-py>=3.0",
     "fastapi>=0.136",
     "uvicorn>=0.48",
     "pydantic>=2.13",
