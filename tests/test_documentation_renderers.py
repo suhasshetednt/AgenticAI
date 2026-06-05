@@ -49,3 +49,45 @@ def test_markdown_renderer_writes_file_verbatim(tmp_path: Path) -> None:
     out = r.render("# Hello\n\nBody", tmp_path / "doc.md", DocContext(title="x"))
     assert out.read_text(encoding="utf-8") == "# Hello\n\nBody"
     assert out.suffix == ".md"
+
+
+from docx import Document as _Doc
+
+_MD = """# Title
+
+Intro paragraph.
+
+## Risks
+
+| Risk | Mitigation |
+|------|------------|
+| Schema drift | Validate with EXPLAIN |
+| Large scan | Add filter |
+
+## Steps
+
+- First step
+- Second step
+
+```sql
+SELECT 1
+```
+"""
+
+
+@pytest.mark.unit
+def test_docx_renderer_maps_markdown_to_docx_model(tmp_path: Path) -> None:
+    r = renderers_base.get_renderer("docx")
+    out = r.render(_MD, tmp_path / "doc.docx", DocContext(title="Title"))
+    assert out.suffix == ".docx"
+
+    doc = _Doc(str(out))
+    texts = [p.text for p in doc.paragraphs]
+    assert "Title" in texts
+    assert "Intro paragraph." in texts
+    assert any("First step" == t for t in texts)
+    # one table with header + 2 rows
+    assert len(doc.tables) == 1
+    assert doc.tables[0].rows[0].cells[0].text == "Risk"
+    assert doc.tables[0].rows[1].cells[1].text == "Validate with EXPLAIN"
+    assert len(doc.tables[0].rows) == 3
