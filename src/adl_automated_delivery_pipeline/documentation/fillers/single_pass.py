@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 from typing import Any
 
@@ -41,8 +42,9 @@ class SinglePassFiller:
 
     def fill(self, template: Template, context: DocContext) -> str:
         skeleton = resolve_placeholders(template.raw, context)
+        facts = json.dumps(context.data, ensure_ascii=False, indent=2, default=str)
         prompt = (
-            f"--- CONTEXT (facts) ---\n{context.data}\n\n"
+            f"--- CONTEXT (facts) ---\n{facts}\n\n"
             f"--- TITLE ---\n{context.title}\n{context.subtitle}\n\n"
             f"--- TEMPLATE TO FILL ---\n{skeleton}\n"
         )

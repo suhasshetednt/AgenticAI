@@ -6,8 +6,24 @@ import pytest
 
 from adl_automated_delivery_pipeline.documentation.context import DocContext
 from adl_automated_delivery_pipeline.documentation.fillers import base as fillers_base
-from adl_automated_delivery_pipeline.documentation.fillers.single_pass import SinglePassFiller
+from adl_automated_delivery_pipeline.documentation.fillers.single_pass import (
+    SinglePassFiller,
+    _strip_fences,
+)
 from adl_automated_delivery_pipeline.documentation.template import Template
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    "raw, expected",
+    [
+        ("# Title\n\nBody", "# Title\n\nBody"),                 # no fence: unchanged
+        ("```markdown\n# Title\n\nBody\n```", "# Title\n\nBody"),  # ```markdown fence stripped
+        ("```\n# Title\n```", "# Title"),                        # bare fence stripped
+    ],
+)
+def test_strip_fences(raw: str, expected: str) -> None:
+    assert _strip_fences(raw) == expected
 
 
 class _FakeResponse:

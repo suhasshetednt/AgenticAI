@@ -42,6 +42,11 @@ adl-doc = "adl_automated_delivery_pipeline.workflows.generate_doc:main"
 where = ["src"]
 include = ["adl_automated_delivery_pipeline*"]
 
+[tool.setuptools.package-data]
+# Ship markdown templates inside the wheel/sdist (not just editable installs),
+# so Template.load(...) resolves them in non-editable deployments.
+"adl_automated_delivery_pipeline" = ["templates/*.md"]
+
 [tool.black]
 line-length = 100
 target-version = ["py311"]
