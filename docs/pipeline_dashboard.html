@@ -58,9 +58,16 @@
   </div>
   <div id="detail">
     <div id="approval"></div>
+    <div id="promptbar" style="display:none;background:#161c2b;border:1px solid #26304a;border-radius:10px;padding:10px;">
+      <div class="label" id="promptlabel">Input</div>
+      <div style="display:flex;gap:8px;">
+        <input id="prompttext" style="flex:1;padding:7px 9px;border-radius:6px;border:1px solid #26304a;background:#0b101a;color:#fff;" placeholder="type a menu option / response, then Enter" />
+        <button id="promptsend" style="padding:7px 14px;border-radius:6px;border:0;background:#c89a00;color:#1a1a1a;font-weight:600;cursor:pointer;">Send</button>
+      </div>
+    </div>
     <div>
       <div class="label">Artifacts</div>
-      <div id="artifacts"><span style="color:#566">none yet</span></div>
+      <div id="artifacts"><span class="ph" style="color:#566">none yet</span></div>
     </div>
     <div id="log"></div>
   </div>
@@ -90,9 +97,13 @@
     if(cls) div.className = cls; div.textContent = text;
     log.appendChild(div); log.scrollTop = log.scrollHeight;
   }
+  function sendWs(data){
+    if(!ws || ws.readyState !== WebSocket.OPEN){ setStatus("not connected — wait a moment"); return false; }
+    ws.send(data); return true;
+  }
   function addArtifact(kind, value){
     const box = $("#artifacts");
-    if(box.querySelector("span")) box.innerHTML = "";
+    const ph = box.querySelector(".ph"); if(ph) ph.remove();   // clear only the placeholder, keep prior chips
     const chip = document.createElement("span"); chip.className = "chip";
     const isUrl = /^https?:\/\//.test(value);
     chip.innerHTML = (kind+": ") + (isUrl ? '<a href="'+value+'" target="_blank">'+value+'</a>' : value);
@@ -103,20 +114,29 @@
     a.innerHTML = '⚠ Approve <b>'+kind+'</b>: '+detail +
       '<div class="btns"><button class="approve">Approve</button><button class="reject">Reject</button></div>';
     a.classList.add("show");
-    const stage = kind === "dremio" ? "dremio" : "qlik";
-    setStage(stage, "waiting");
-    a.querySelector(".approve").onclick = ()=>{ ws && ws.send("y"); a.classList.remove("show"); };
-    a.querySelector(".reject").onclick  = ()=>{ ws && ws.send("n"); a.classList.remove("show"); };
+    setStage(kind === "dremio" ? "dremio" : "qlik", "waiting");
+    a.querySelector(".approve").onclick = ()=>{ if(sendWs("y")) a.classList.remove("show"); };
+    a.querySelector(".reject").onclick  = ()=>{ if(sendWs("n")) a.classList.remove("show"); };
+  }
+  function showPrompt(text){
+    $("#promptlabel").textContent = (text||"Input").trim() || "Input";
+    $("#promptbar").style.display = "block";
+    const t = $("#prompttext"); t.value = ""; t.focus();
+  }
+  function hidePrompt(){ $("#promptbar").style.display = "none"; }
+  function sendPrompt(){
+    const t = $("#prompttext");
+    if(sendWs(t.value)){ logLine("> "+t.value); t.value=""; hidePrompt(); }
   }
   function resetUI(){
     stagesOrder.forEach(n=>{ const el=stageEl(n); el.dataset.st="pending"; el.querySelector(".t").textContent=""; });
-    $("#log").innerHTML=""; $("#artifacts").innerHTML='<span style="color:#566">none yet</span>';
-    $("#approval").classList.remove("show"); startTimes={}; activeStage=null;
+    $("#log").innerHTML=""; $("#artifacts").innerHTML='<span class="ph" style="color:#566">none yet</span>';
+    $("#approval").classList.remove("show"); hidePrompt(); startTimes={}; activeStage=null;
   }
   function handle(msg){
     if(msg.type === "error"){ if(activeStage) setStage(activeStage,"fail"); logLine(msg.message,"err"); return; }
-    if(msg.type === "done"){ setStatus("done"); return; }
-    if(msg.type === "prompt"){ logLine(msg.message); return; } // browse-mode menus echo here
+    if(msg.type === "done"){ setStatus("complete"); hidePrompt(); return; }
+    if(msg.type === "prompt"){ logLine(msg.message); showPrompt(msg.message); return; } // bridged input(): show input box
     // type === "log": could be a marker or body text
     const p = parseMarker(msg.message);
     if(p.kind === "stage") setStage(p.name, p.status === "start" ? "running" : (p.status === "done" ? "done" : "fail"));
@@ -129,14 +149,16 @@
     ws = new WebSocket((location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/ws");
     ws.onopen = ()=> setStatus("connected");
     ws.onclose = ()=> setStatus("disconnected");
+    ws.onerror = ()=> setStatus("connection error — see console");
     ws.onmessage = (e)=>{ try { handle(JSON.parse(e.data)); } catch(_) { logLine(e.data); } };
   }
   $("#run").onclick = ()=>{
     const key = $("#key").value.trim(); if(!key) return;
-    resetUI(); setStatus("running "+key);
-    ws.send(JSON.stringify({action:"start", mode:"ticket", key}));
+    resetUI(); if(sendWs(JSON.stringify({action:"start", mode:"ticket", key}))) setStatus("running "+key);
   };
-  $("#browse").onclick = ()=>{ resetUI(); setStatus("browse"); ws.send(JSON.stringify({action:"start", mode:"browse"})); };
+  $("#browse").onclick = ()=>{ resetUI(); if(sendWs(JSON.stringify({action:"start", mode:"browse"}))) setStatus("browse"); };
+  $("#promptsend").onclick = sendPrompt;
+  $("#prompttext").addEventListener("keydown", (e)=>{ if(e.key === "Enter") sendPrompt(); });
   connect();
 </script>
 </body>
