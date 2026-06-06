@@ -112,9 +112,6 @@
         .t-empty { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; opacity:.25; }
         .t-empty-lbl { font-family:'Orbitron',monospace; font-size:8px; letter-spacing:3px; color:#00b4ff; }
 
-        /* ── NEO GLOW behind robot ── */
-        @keyframes neo-pulse { 0%,100%{opacity:.5;transform:scale(1)} 50%{opacity:1;transform:scale(1.06)} }
-        @keyframes neo-ring  { 0%{transform:scale(1);opacity:.6} 100%{transform:scale(2.2);opacity:0} }
     </style>
 </head>
 <body>
@@ -130,50 +127,40 @@
     }
 }
 </script>
-<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 <script type="text/babel" data-type="module">
 import React,{useState,useEffect,useRef}from'react';
 import{createRoot}from'react-dom/client';
 import{motion}from'framer-motion';
 import{Activity,RefreshCw}from'lucide-react';
 
-// ─── NODE LAYOUT ─────────────────────────────────────────────────────────────
-// Single centered column for jira→doc→dremio, qlik to the right of dremio, git below qlik
+// ─── NODE LAYOUT — pentagon mesh (5 nodes, fully connected) ──────────────────
+// Centre (480, 490), radius 300. Flow order: jira(top)→doc(TL)→dremio(BL)→qlik(BR)→git(TR)
+// Node box is NW×NH = 128×180 px, so top-left = centre − (64, 90).
 const NODES_INIT = [
-    {id:'jira',  label:'Jira Agent',    icon:'https://cdn.worldvectorlogo.com/logos/jira-3.svg',                             x:310, y:50,  theme:'from-blue-400 to-blue-600',   color:'#3B82F6', status:'pending', time:'-'},
-    {id:'doc',   label:'Documentation', icon:'https://cdn-icons-png.flaticon.com/512/3979/3979305.png',                       x:310, y:300, theme:'from-emerald-400 to-emerald-600', color:'#10B981', status:'pending', time:'-'},
-    {id:'dremio',label:'Dremio Agent',  icon:'https://www.vectorlogo.zone/logos/dremio/dremio-icon.svg',                      x:310, y:550, theme:'from-orange-400 to-orange-600',  color:'#F97316', status:'pending', time:'-'},
-    {id:'qlik',  label:'Qlik Agent',    icon:'https://images.icon-icons.com/2107/PNG/512/file_type_qlikview_icon_130217.png', x:680, y:550, theme:'from-green-400 to-green-600',    color:'#22C55E', status:'pending', time:'-'},
-    {id:'git',   label:'GitHub Agent',  icon:'https://cdn.worldvectorlogo.com/logos/github-icon-1.svg',                       x:680, y:800, theme:'from-purple-400 to-purple-600',  color:'#A855F7', status:'pending', time:'-'},
+    {id:'jira',  label:'Jira Agent',    icon:'https://cdn.worldvectorlogo.com/logos/jira-3.svg',                             x:416, y:110, theme:'from-blue-400 to-blue-600',       color:'#3B82F6', status:'pending', time:'-'},
+    {id:'doc',   label:'Documentation', icon:'https://cdn-icons-png.flaticon.com/512/3979/3979305.png',                       x:131, y:317, theme:'from-emerald-400 to-emerald-600', color:'#10B981', status:'pending', time:'-'},
+    {id:'dremio',label:'Dremio Agent',  icon:'https://www.vectorlogo.zone/logos/dremio/dremio-icon.svg',                      x:240, y:653, theme:'from-orange-400 to-orange-600',   color:'#F97316', status:'pending', time:'-'},
+    {id:'qlik',  label:'Qlik Agent',    icon:'https://images.icon-icons.com/2107/PNG/512/file_type_qlikview_icon_130217.png', x:592, y:653, theme:'from-green-400 to-green-600',     color:'#22C55E', status:'pending', time:'-'},
+    {id:'git',   label:'GitHub Agent',  icon:'https://cdn.worldvectorlogo.com/logos/github-icon-1.svg',                       x:701, y:317, theme:'from-purple-400 to-purple-600',   color:'#A855F7', status:'pending', time:'-'},
 ];
 
-// ─── EDGES — one line per pair, direction controlled by state ─────────────────
-// Each edge has a fixed SVG path. We animate a plane FROM src TO tgt when active.
-// The "active" object holds: { edgeId, fromId, toId, color }
-// Only ONE edge can carry a plane at a time per pair. Direction flips as needed.
+// ─── EDGES — fully-connected mesh (10 edges = 5×4/2) ─────────────────────────
+// type:'flow'  = primary pipeline perimeter (jira→doc→dremio→qlik→git), slightly brighter
+// type:'mesh'  = cross-links (every remaining pair), dimmer dashed; any agent can use these
 const EDGE_DEFS = [
-    {id:'j-d',  a:'jira',  b:'doc',    type:'vert'},
-    {id:'d-dr', a:'doc',   b:'dremio', type:'vert'},
-    {id:'dr-q', a:'dremio',b:'qlik',   type:'horiz'},
-    {id:'q-g',  a:'qlik',  b:'git',    type:'vert'},
-    {id:'q-j',  a:'qlik',  b:'jira',   type:'curve'},  // shared line for qlik↔jira
+    // Primary delivery flow — pentagon perimeter, clockwise
+    {id:'j-d',  a:'jira',  b:'doc',    type:'flow'},
+    {id:'d-dr', a:'doc',   b:'dremio', type:'flow'},
+    {id:'dr-q', a:'dremio',b:'qlik',   type:'flow'},
+    {id:'q-g',  a:'qlik',  b:'git',    type:'flow'},
+    // Mesh cross-links — every remaining pair (drawn behind the flow edges)
+    {id:'j-dr', a:'jira',  b:'dremio', type:'mesh'},
+    {id:'j-q',  a:'jira',  b:'qlik',   type:'mesh'},
+    {id:'j-g',  a:'jira',  b:'git',    type:'mesh'},
+    {id:'d-q',  a:'doc',   b:'qlik',   type:'mesh'},
+    {id:'d-g',  a:'doc',   b:'git',    type:'mesh'},
+    {id:'dr-g', a:'dremio',b:'git',    type:'mesh'},
 ];
-
-// ─── SENTINEL MARKERS (our robust contract; ride the log channel) ────────────
-const _SENT_STAGE    = /^::STAGE\s+(\w+)\s+(start|done|fail)::$/;
-const _SENT_ARTIFACT = /^::ARTIFACT\s+(\w+)=(.*)::$/;
-const _SENT_APPROVE  = /^::APPROVE\s+(\w+)=(.*)::$/;
-const parseSentinel = (line) => {
-    const s = String(line).trim(); let m;
-    if((m=s.match(_SENT_STAGE)))    return {kind:'stage',    name:m[1], status:m[2]};
-    if((m=s.match(_SENT_ARTIFACT))) return {kind:'artifact', akind:m[1], value:m[2]};
-    if((m=s.match(_SENT_APPROVE)))  return {kind:'approve',  akind:m[1], detail:m[2]};
-    if(s==='::DONE::')              return {kind:'done'};
-    return null;
-};
-// our stage names → prototype node ids (reqs folds into the Jira agent)
-const STAGE_NODE   = {jira:'jira', reqs:'jira', doc:'doc', dremio:'dremio', qlik:'qlik'};
-const STAGE_STATUS = {start:'running', done:'completed', fail:'error'};
 
 // ─── TURBINE ─────────────────────────────────────────────────────────────────
 const TurbineSVG = ({spinning, idle}) => {
@@ -227,33 +214,35 @@ const TurbineSVG = ({spinning, idle}) => {
 // NODE_W=128 node box width, NODE_H=180 node box height
 const NW=128, NH=180;
 
+// Pentagon centre — used to bow mesh cross-links OUTWARD so they arc around the
+// perimeter and never cross through the hub in an ugly way.
+const MESH_CX = 480, MESH_CY = 490;
+
 const getEdgePath = (edge, nodesMap) => {
     const A = nodesMap[edge.a];
     const B = nodesMap[edge.b];
     if(!A||!B) return '';
-
-    if(edge.type==='vert'){
-        // bottom-center of A → top-center of B
-        const sx=A.x+NW/2, sy=A.y+NH;
-        const ex=B.x+NW/2, ey=B.y;
-        const midY=sy+(ey-sy)/2;
-        return `M${sx} ${sy} L${sx} ${midY} L${ex} ${midY} L${ex} ${ey}`;
+    // All edges: centre-to-centre quadratic bezier
+    const ax=A.x+NW/2, ay=A.y+NH/2;
+    const bx=B.x+NW/2, by=B.y+NH/2;
+    const mx=(ax+bx)/2,  my=(ay+by)/2;
+    const len=Math.hypot(bx-ax, by-ay)||1;
+    let cx, cy;
+    if(edge.type==='flow'){
+        // Flow: gentle bow perpendicular-left of travel direction
+        const dx=bx-ax, dy=by-ay;
+        const nx=-dy/len, ny=dx/len;
+        const bow=Math.min(45, len*0.09);
+        cx=mx+nx*bow; cy=my+ny*bow;
+    } else {
+        // Mesh cross-links: bow OUTWARD from the pentagon centre so arcs
+        // stay on the outside of the hub and never tangle with flow lines.
+        const dcx=mx-MESH_CX, dcy=my-MESH_CY;
+        const dlen=Math.hypot(dcx,dcy)||1;
+        const bow=Math.min(110, len*0.26);
+        cx=mx+dcx/dlen*bow; cy=my+dcy/dlen*bow;
     }
-    if(edge.type==='horiz'){
-        // right-center of A → left-center of B (same row)
-        const sx=A.x+NW, sy=A.y+NH/2;
-        const ex=B.x,    ey=B.y+NH/2;
-        return `M${sx} ${sy} L${ex} ${ey}`;
-    }
-    if(edge.type==='curve'){
-        // Single curved line between qlik and jira (right side sweep)
-        const ax=A.x+NW, ay=A.y+NH/2;  // qlik right-mid
-        const bx=B.x+NW, by=B.y+NH/2;  // jira right-mid
-        const cx1=ax+170, cy1=ay;
-        const cx2=bx+190, cy2=by;
-        return `M${ax} ${ay} C${cx1} ${cy1},${cx2} ${cy2},${bx} ${by}`;
-    }
-    return '';
+    return `M${ax} ${ay} Q${cx} ${cy} ${bx} ${by}`;
 };
 
 // Mini airplane — points in +X direction, animateMotion rotates it to path
@@ -278,24 +267,30 @@ const Edge = ({edge, nodesMap, activePlane}) => {
     const path = getEdgePath(edge, nodesMap);
     if(!path) return null;
 
-    // activePlane: {edgeId, fromId, toId, color}  — fromId/toId determine direction
     const isActive = activePlane && activePlane.edgeId === edge.id;
-    // If from=b→a we reverse the path for the plane (fly backwards along same line)
     const planeReversed = isActive && activePlane.fromId === edge.b;
-    // Build reversed path string by swapping M endpoint and reversing bezier
     const planePath = planeReversed ? reversePath(path, edge, nodesMap) : path;
     const planeColor = isActive ? activePlane.color : '#3B82F6';
+    const isFlow = edge.type === 'flow';
 
     return (
         <g>
-            {/* Static base line — always shown */}
-            <path d={path} stroke="rgba(255,255,255,0.13)" strokeWidth="1.8" fill="none" strokeDasharray={isActive?"none":"6 5"}/>
-            {/* Glow when active */}
-            {isActive && <path d={path} stroke={planeColor} strokeWidth="2" fill="none" opacity=".45"
-                style={{filter:`drop-shadow(0 0 5px ${planeColor})`}}/>}
+            {/* Ambient glow layer for flow edges (always-on soft halo) */}
+            {isFlow && !isActive && (
+                <path d={path} stroke="rgba(0,180,255,0.06)" strokeWidth="6" fill="none"/>
+            )}
+            {/* Base line */}
+            <path d={path}
+                stroke={isActive ? planeColor : (isFlow ? "rgba(0,180,255,0.30)" : "rgba(0,180,255,0.10)")}
+                strokeWidth={isFlow ? 1.8 : 1.1} fill="none"
+                strokeDasharray={isActive ? "none" : (isFlow ? "10 6" : "2 12")}
+                opacity={isActive ? 1 : 1}/>
+            {/* Active glow path */}
+            {isActive && <path d={path} stroke={planeColor} strokeWidth="3" fill="none" opacity=".5"
+                style={{filter:`drop-shadow(0 0 8px ${planeColor})`}}/>}
             {/* Flying plane */}
             {isActive && (
-                <g style={{filter:`drop-shadow(0 0 4px ${planeColor})`}}>
+                <g style={{filter:`drop-shadow(0 0 5px ${planeColor})`}}>
                     <animateMotion dur="2s" repeatCount="indefinite" path={planePath} rotate="auto"/>
                     <Plane color={planeColor}/>
                 </g>
@@ -304,31 +299,32 @@ const Edge = ({edge, nodesMap, activePlane}) => {
     );
 };
 
-// Reverse a path so the plane flies the other direction along same line
+// Reverse a path: swap endpoints, keep the same arc (mirror control point bow)
 const reversePath = (path, edge, nodesMap) => {
     const A = nodesMap[edge.a];
     const B = nodesMap[edge.b];
     if(!A||!B) return path;
-    if(edge.type==='vert'){
-        const sx=B.x+NW/2, sy=B.y+NH;   // now B is source
-        const ex=A.x+NW/2, ey=A.y;
-        const midY=sy+(ey-sy)/2;
-        return `M${sx} ${sy} L${sx} ${midY} L${ex} ${midY} L${ex} ${ey}`;
+    // Swap A↔B so the plane departs from B toward A
+    const ax=B.x+NW/2, ay=B.y+NH/2;
+    const bx=A.x+NW/2, by=A.y+NH/2;
+    const mx=(ax+bx)/2,  my=(ay+by)/2;
+    const len=Math.hypot(bx-ax, by-ay)||1;
+    let cx, cy;
+    if(edge.type==='flow'){
+        // Mirror: negate perpendicular bow so the arc traces the same curve
+        const dx=bx-ax, dy=by-ay;
+        const nx=-dy/len, ny=dx/len;
+        const bow=Math.min(45, len*0.09);
+        // Original bow was +left-of-A→B; reversed is +left-of-B→A = -left-of-A→B
+        cx=mx-nx*bow; cy=my-ny*bow;
+    } else {
+        // Mesh: outward bow from pentagon centre is symmetric for either direction
+        const dcx=mx-MESH_CX, dcy=my-MESH_CY;
+        const dlen=Math.hypot(dcx,dcy)||1;
+        const bow=Math.min(110, len*0.26);
+        cx=mx+dcx/dlen*bow; cy=my+dcy/dlen*bow;
     }
-    if(edge.type==='horiz'){
-        const sx=B.x, sy=B.y+NH/2;
-        const ex=A.x+NW, ey=A.y+NH/2;
-        return `M${sx} ${sy} L${ex} ${ey}`;
-    }
-    if(edge.type==='curve'){
-        // reverse: jira → qlik
-        const ax=B.x+NW, ay=B.y+NH/2;  // jira right
-        const bx=A.x+NW, by=A.y+NH/2;  // qlik right
-        const cx1=ax+190, cy1=ay;
-        const cx2=bx+170, cy2=by;
-        return `M${ax} ${ay} C${cx1} ${cy1},${cx2} ${cy2},${bx} ${by}`;
-    }
-    return path;
+    return `M${ax} ${ay} Q${cx} ${cy} ${bx} ${by}`;
 };
 
 // ─── AGENT ROBOT (original style) ─────────────────────────────────────────────
@@ -344,38 +340,20 @@ const AgentRobot = ({node}) => {
     return (
         <div style={{position:'relative', display:'flex', flexDirection:'column', alignItems:'center', width:128}}>
 
-            {/* ── NEO GLOW (behind robot, only when running/done) ── */}
-            {(isRunning||isDone) && (
-                <div style={{
-                    // Outer layer: CENTERING ONLY — this transform is never animated,
-                    // so the aura stays locked behind the robot.
-                    position:'absolute', top:'50%', left:'50%',
-                    transform:'translate(-50%,-60%)',
-                    width: isRunning?260:200, height: isRunning?260:200,
-                    pointerEvents:'none', zIndex:0,
-                }}>
-                    {/* Inner layer: the PULSE. neo-pulse animates transform:scale here,
-                        where it can't clobber the centering transform above (that was
-                        the desync bug — two transforms fighting on one element). */}
-                    <div style={{
-                        position:'absolute', inset:0, borderRadius:'50%',
-                        background:`radial-gradient(circle, ${node.color}${isRunning?'55':'28'} 0%, transparent 68%)`,
-                        animation: isRunning?'neo-pulse 2s ease-in-out infinite':'none',
-                    }}>
-                        {isRunning && (
-                            <div style={{
-                                position:'absolute', inset:0, borderRadius:'50%',
-                                border:`2px solid ${node.color}60`,
-                                animation:'neo-ring 2s ease-out infinite',
-                            }}/>
-                        )}
-                    </div>
-                </div>
-            )}
-
+            {/* ── AURA: robot silhouette glow via drop-shadow filter ── */}
             <motion.div
-                animate={{y:[0,-12,0]}}
-                transition={{duration:3.5,repeat:Infinity,ease:'easeInOut'}}
+                animate={{
+                    y:[0,-12,0],
+                    filter:(isRunning||isHealing)?[
+                        `drop-shadow(0 0 4px ${pc}aa) drop-shadow(0 0 14px ${pc}55)`,
+                        `drop-shadow(0 0 14px ${pc}) drop-shadow(0 0 32px ${pc}99) drop-shadow(0 0 56px ${pc}44)`,
+                        `drop-shadow(0 0 4px ${pc}aa) drop-shadow(0 0 14px ${pc}55)`,
+                    ]:isDone?`drop-shadow(0 0 8px ${pc}99) drop-shadow(0 0 18px ${pc}44)`:'none',
+                }}
+                transition={{
+                    y:{duration:3.5,repeat:Infinity,ease:'easeInOut'},
+                    filter:(isRunning||isHealing)?{duration:1.6,repeat:Infinity,ease:'easeInOut'}:{duration:0.6},
+                }}
                 style={{position:'relative',zIndex:1,width:96,display:'flex',flexDirection:'column',alignItems:'center'}}
             >
                 {/* Antenna */}
@@ -458,7 +436,6 @@ const App = () => {
     const [inputVal,setInputVal]   = useState('');
     const [wsState,setWsState]     = useState('connecting');
     const [activePlane,setActivePlane] = useState(null);
-    const [ticketKey,setTicketKey]     = useState('');
     const ws         = useRef(null);
     const termEndRef = useRef(null);
     const nodesRef   = useRef(nodes);
@@ -471,52 +448,24 @@ const App = () => {
     const flyPlane  = (edgeId,fromId,toId,color) => setActivePlane({edgeId,fromId,toId,color});
     const stopPlane = ()      => setActivePlane(null);
 
-    // Drive nodes from our sentinel markers (robust; preferred over log-string matching)
-    const applyMarker = (mk) => {
-        if(mk.kind==='stage'){
-            const node = STAGE_NODE[mk.name];
-            if(node){
-                upNode(node, {status:STAGE_STATUS[mk.status], time:mk.status==='start'?'...':'Done'});
-                if(mk.status==='done'){
-                    if(node==='jira')        flyPlane('j-d','jira','doc','#3B82F6');
-                    else if(node==='doc')    flyPlane('d-dr','doc','dremio','#10B981');
-                    else if(node==='dremio') flyPlane('dr-q','dremio','qlik','#F97316');
-                    else if(node==='qlik')   flyPlane('q-g','qlik','git','#22C55E');
-                }
-            }
-            addLine(`▸ ${mk.name} ${mk.status}`);
-        } else if(mk.kind==='artifact'){
-            addLine(`📎 ${mk.akind}: ${mk.value}`);
-        } else if(mk.kind==='approve'){
-            upNode(mk.akind==='dremio'?'dremio':'qlik', {status:'waiting'});
-            addLine(`⚠ approve ${mk.akind}: ${mk.detail}`);
-        } else if(mk.kind==='done'){
-            stopPlane(); setWsState('done');
-        }
-    };
-
-    // Quick-run by ticket key → run_ticket on the backend (typed start payload)
-    const runTicket = () => {
-        if(wsState!=='ready_to_start' || !ticketKey.trim()) return;
-        ws.current.send(JSON.stringify({action:'start', mode:'ticket', key:ticketKey.trim()}));
-        setWsState('processing');
-    };
-
     // ── Direct WebSocket — simple and reliable ─────────────────────────────────
     useEffect(() => {
+        console.log('[WS] Creating WebSocket connection...');
         ws.current = new WebSocket('ws://localhost:8000/ws');
 
-        ws.current.onopen = () => setWsState('ready_to_start');
+        ws.current.onopen = () => { console.log('[WS] Connected!'); setWsState('ready_to_start'); };
 
-        ws.current.onclose = () => setWsState('disconnected');
+        ws.current.onclose = (e) => { console.warn('[WS] Closed:', e.code, e.reason); setWsState('disconnected'); };
+
+        ws.current.onerror = (e) => { console.error('[WS] Error:', e); };
 
         ws.current.onmessage = (event) => {
             let data;
-            try { data = JSON.parse(event.data); } catch(e) { return; }
+            try { data = JSON.parse(event.data); } catch(e) { console.error('[WS] JSON parse failed:', event.data); return; }
+            console.log('[WS] Message:', data.type, data.message?.substring(0, 80));
 
+            try {
             if (data.type === 'log') {
-                const _mk = parseSentinel(data.message);
-                if (_mk) { applyMarker(_mk); return; }   // robust marker path — don't show the raw marker line
                 addLine(data.message);
                 const m = data.message;
                 // JIRA
@@ -570,6 +519,7 @@ const App = () => {
             } else if (data.type === 'done') {
                 setWsState('done'); stopPlane();
             }
+            } catch(err) { console.error('[WS] Handler error:', err); }
         };
 
         return () => ws.current.close();
@@ -577,7 +527,8 @@ const App = () => {
 
     const handleSubmit = e => {
         e.preventDefault();
-        if (!prompt || !inputVal.trim()) return;
+        if (!prompt) return;
+        console.log('[SUBMIT] Sending:', inputVal);
         addLine('  → ' + inputVal);
         ws.current.send(inputVal);
         setInputVal(''); setPrompt(null); setWsState('processing');
@@ -602,11 +553,6 @@ const App = () => {
                         <h1 style={{fontWeight:600,fontSize:14,letterSpacing:1,color:'#e2e8f0'}}>DataLake Workflow Orchestrator</h1>
                     </div>
                     <div style={{display:'flex',alignItems:'center',gap:12}}>
-                        <input value={ticketKey} onChange={e=>setTicketKey(e.target.value)}
-                            onKeyDown={e=>{if(e.key==='Enter')runTicket();}} placeholder="ADL-1729"
-                            style={{width:120,padding:'6px 10px',borderRadius:6,border:'1px solid rgba(255,255,255,0.12)',background:'rgba(255,255,255,0.05)',color:'#e2e8f0',fontSize:12,outline:'none'}}/>
-                        <button onClick={runTicket} disabled={wsState!=='ready_to_start'}
-                            style={{fontSize:12,color:'#050505',background:'#00b4ff',padding:'6px 14px',borderRadius:6,border:0,fontWeight:600,cursor:wsState==='ready_to_start'?'pointer':'not-allowed',opacity:wsState==='ready_to_start'?1:.4}}>Run</button>
                         <div style={{display:'flex',gap:6}}>
                             {[['disconnected','#ef4444'],['connecting','#f59e0b'],['ready_to_start','#10b981']].map(([s,c])=>{
                                 const on=(s===wsState)||(s==='ready_to_start'&&['processing','waiting_input','done'].includes(wsState));
@@ -630,7 +576,11 @@ const App = () => {
                                     <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
                                 </filter>
                             </defs>
-                            {EDGE_DEFS.map(edge=>(
+                            {/* Render mesh cross-links first (behind), flow edges on top */}
+                            {EDGE_DEFS.filter(e=>e.type==='mesh').map(edge=>(
+                                <Edge key={edge.id} edge={edge} nodesMap={nodesMap} activePlane={activePlane}/>
+                            ))}
+                            {EDGE_DEFS.filter(e=>e.type==='flow').map(edge=>(
                                 <Edge key={edge.id} edge={edge} nodesMap={nodesMap} activePlane={activePlane}/>
                             ))}
                         </svg>
@@ -721,7 +671,7 @@ const App = () => {
                         <motion.div initial={{opacity:0,y:6}} animate={{opacity:1,y:0}} className="t-prompt-wrap">
                             <span className="t-prompt-text">{prompt}</span>
                             <form style={{flex:1,display:'flex',alignItems:'center',gap:6}} onSubmit={handleSubmit}>
-                                <input autoFocus className="t-prompt-input" value={inputVal}
+                                <input autoFocus id="pipeline-prompt" name="pipeline-prompt" autoComplete="off" className="t-prompt-input" value={inputVal}
                                     onChange={e=>setInputVal(e.target.value)} placeholder="input..."/>
                                 <div className="t-cursor"/>
                             </form>
