@@ -1,165 +1,738 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="dark">
 <head>
-<meta charset="utf-8" />
-<title>ADL — Live Pipeline Dashboard</title>
-<style>
-  :root { --navy:#00386b; --gold:#c89a00; --bg:#0f1420; --panel:#161c2b; --line:#26304a; --ok:#1f9d55; --run:#caa300; --fail:#d14; --muted:#8aa; }
-  * { box-sizing: border-box; }
-  body { margin:0; font-family:system-ui,Segoe UI,Arial,sans-serif; background:var(--bg); color:#e6ebf5; }
-  header { background:var(--navy); padding:12px 18px; display:flex; gap:10px; align-items:center; }
-  header h1 { font-size:15px; margin:0 16px 0 0; color:#fff; }
-  header input { flex:0 0 200px; padding:7px 9px; border-radius:6px; border:1px solid var(--line); background:#0b101a; color:#fff; }
-  header button { padding:7px 14px; border-radius:6px; border:0; background:var(--gold); color:#1a1a1a; font-weight:600; cursor:pointer; }
-  header button.secondary { background:#2a3350; color:#dfe6f5; }
-  #status { margin-left:auto; font-size:12px; color:var(--muted); }
-  main { display:flex; gap:14px; padding:14px; height:calc(100vh - 58px); }
-  #timeline { flex:0 0 230px; background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:10px; }
-  .stage { display:flex; align-items:center; gap:8px; padding:9px 8px; border-radius:8px; cursor:pointer; font-size:13px; }
-  .stage.active { background:#1d2740; }
-  .dot { width:12px; height:12px; border-radius:50%; border:2px solid #44506e; }
-  .stage[data-st="running"] .dot { background:var(--run); border-color:var(--run); animation:pulse 1s infinite; }
-  .stage[data-st="done"] .dot { background:var(--ok); border-color:var(--ok); }
-  .stage[data-st="fail"] .dot { background:var(--fail); border-color:var(--fail); }
-  .stage[data-st="waiting"] .dot { background:var(--gold); border-color:var(--gold); }
-  .stage .t { margin-left:auto; font-size:11px; color:var(--muted); }
-  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.35} }
-  #detail { flex:1; display:flex; flex-direction:column; gap:10px; min-width:0; }
-  #approval { display:none; background:#1a1407; border:1px solid #4a3d12; border-radius:10px; padding:12px; }
-  #approval.show { display:block; }
-  #approval b { color:var(--gold); }
-  #approval .btns { margin-top:8px; display:flex; gap:8px; }
-  #approval button { padding:6px 14px; border-radius:6px; border:0; cursor:pointer; font-weight:600; }
-  .approve { background:var(--ok); color:#fff; } .reject { background:#3a2330; color:#f3c; }
-  #log { flex:1; overflow:auto; background:#05080f; border:1px solid var(--line); border-radius:10px; padding:10px; font-family:Consolas,monospace; font-size:12px; line-height:1.5; white-space:pre-wrap; color:#bfe6bf; }
-  #log .err { color:#ff8080; }
-  #artifacts { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:10px; min-height:42px; }
-  #artifacts .chip { display:inline-block; margin:3px; padding:5px 10px; border-radius:14px; background:#10203a; border:1px solid #2a4a78; font-size:12px; }
-  #artifacts a { color:#8fc6ff; text-decoration:none; }
-  .label { font-size:11px; text-transform:uppercase; letter-spacing:.5px; color:var(--muted); margin-bottom:4px; }
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive AI Ops Control Center</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        background: '#050505',
+                        surface: 'rgba(17, 17, 17, 0.7)',
+                        primary: '#3B82F6',
+                        success: '#10B981',
+                        warning: '#F59E0B',
+                        error: '#EF4444',
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    }
+                }
+            }
+        }
+    </script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&family=Orbitron:wght@400;600;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <style>
+        body { background-color: #050505; color: #ededed; overflow: hidden; margin: 0; }
+        .glass { background: rgba(17, 17, 17, 0.6); backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.08); }
+        .video-bg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; z-index: 0; opacity: 0.15; }
+        .grid-bg {
+            background-image: 
+                radial-gradient(circle at 50% 0%, rgba(59, 130, 246, 0.15), transparent 40%),
+                linear-gradient(to right, rgba(255,255,255,0.03) 1px, transparent 1px),
+                linear-gradient(to bottom, rgba(255,255,255,0.03) 1px, transparent 1px);
+            background-size: 100% 100%, 40px 40px, 40px 40px;
+        }
+        ::-webkit-scrollbar { width: 5px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(0,180,255,0.2); border-radius: 10px; }
+        select { appearance: none; }
+
+        /* ── TURBINE ── */
+        .turb-blades { transform-origin: 100px 100px; }
+        .turb-blades.t-spinning { animation: turb-spin 0.7s linear infinite; }
+        .turb-blades.t-idle    { animation: turb-spin 5s  linear infinite; }
+        @keyframes turb-spin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
+
+        .turb-btn { background:transparent; border:none; cursor:pointer; outline:none; border-radius:50%; padding:6px; transition:transform .3s; display:block; }
+        .turb-btn:hover:not(:disabled) { transform:scale(1.05); }
+        .turb-btn:disabled { cursor:not-allowed; }
+
+        .engine-panel {
+            position:relative; display:flex; flex-direction:column; align-items:center;
+            padding: 20px 20px 14px; background:rgba(0,0,0,0.5);
+            border-bottom: 1px solid rgba(0,180,255,0.15);
+        }
+        .engine-panel::before { content:''; position:absolute; top:8px; left:8px;  width:12px; height:12px; border-top:1.5px solid rgba(0,180,255,0.45); border-left:1.5px solid rgba(0,180,255,0.45); }
+        .engine-panel::after  { content:''; position:absolute; bottom:8px; right:8px; width:12px; height:12px; border-bottom:1.5px solid rgba(0,180,255,0.45); border-right:1.5px solid rgba(0,180,255,0.45); }
+        .engine-label { font-family:'Orbitron',monospace; font-size:8px; letter-spacing:3px; text-transform:uppercase; color:rgba(0,180,255,0.45); margin-bottom:12px; }
+        .rpm-bar { display:inline-block; width:5px; height:4px; border-radius:1px; }
+
+        /* ── CONSOLE PANEL (right side) ── */
+        .console-panel {
+            width: 500px; flex-shrink:0;
+            background: #050d18;
+            border-left: 1px solid rgba(0,180,255,0.18);
+            box-shadow: -20px 0 60px rgba(0,0,0,0.8);
+            display:flex; flex-direction:column;
+            position:relative; z-index:20;
+        }
+        .console-panel::before {
+            content:''; position:absolute; top:0; left:0;
+            width:1px; height:100%;
+            background: linear-gradient(180deg, transparent, rgba(0,180,255,0.4) 30%, rgba(0,180,255,0.4) 70%, transparent);
+        }
+
+        /* ── TERMINAL LINES ── */
+        .t-line {
+            padding: 7px 12px;
+            border-left: 2px solid rgba(0,180,255,0.2);
+            background: rgba(0,180,255,0.025);
+            border-radius: 0 3px 3px 0;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px; line-height: 1.65;
+            color: #6ea8c8; letter-spacing: 0.3px;
+            white-space: pre-wrap; word-break: break-all;
+            transition: border-color 0.2s, background 0.2s;
+        }
+        .t-line:hover { border-color: rgba(0,180,255,0.45); background: rgba(0,180,255,0.04); }
+        .t-line.t-sep { border-color: rgba(0,180,255,0.08); color: rgba(0,180,255,0.22); }
+        .t-line.t-hdr { border-color: #00b4ff; color: #00b4ff; letter-spacing: 1px; font-weight:600; }
+        .t-line.t-err { border-color: #EF4444; color: #f87171; }
+
+        .t-prompt-wrap {
+            border: 1px solid rgba(0,180,255,0.4);
+            background: rgba(0,180,255,0.06);
+            border-radius: 5px; padding: 10px 14px;
+            display:flex; align-items:center; gap:10px;
+            box-shadow: 0 0 20px rgba(0,180,255,0.1);
+            margin-top: 6px;
+        }
+        .t-prompt-text { font-family:'JetBrains Mono',monospace; font-size:11px; color:#00b4ff; white-space:pre-wrap; flex-shrink:0; max-width:55%; }
+        .t-prompt-input { background:transparent; border:none; outline:none; color:#00b4ff; font-family:'JetBrains Mono',monospace; font-size:11px; flex:1; }
+        .t-cursor { width:8px; height:14px; background:#00b4ff; animation: cur 1s step-end infinite; }
+        @keyframes cur { 0%,100%{opacity:1} 50%{opacity:0} }
+
+        .t-empty { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; opacity:.25; }
+        .t-empty-lbl { font-family:'Orbitron',monospace; font-size:8px; letter-spacing:3px; color:#00b4ff; }
+
+        /* ── NEO GLOW behind robot ── */
+        @keyframes neo-pulse { 0%,100%{opacity:.5;transform:scale(1)} 50%{opacity:1;transform:scale(1.06)} }
+        @keyframes neo-ring  { 0%{transform:scale(1);opacity:.6} 100%{transform:scale(2.2);opacity:0} }
+    </style>
 </head>
 <body>
-<header>
-  <h1>ASL · Live Pipeline</h1>
-  <input id="key" placeholder="ADL-1729" />
-  <button id="run">Run</button>
-  <button id="browse" class="secondary">Browse</button>
-  <span id="status">disconnected</span>
-</header>
-<main>
-  <div id="timeline">
-    <div class="label">Pipeline</div>
-    <div class="stage" data-stage="jira"   data-st="pending"><span class="dot"></span> Jira fetch <span class="t"></span></div>
-    <div class="stage" data-stage="reqs"   data-st="pending"><span class="dot"></span> Extract reqs <span class="t"></span></div>
-    <div class="stage" data-stage="doc"    data-st="pending"><span class="dot"></span> Generate doc <span class="t"></span></div>
-    <div class="stage" data-stage="dremio" data-st="pending"><span class="dot"></span> Dremio VDS <span class="t"></span></div>
-    <div class="stage" data-stage="qlik"   data-st="pending"><span class="dot"></span> Qlik <span class="t"></span></div>
-  </div>
-  <div id="detail">
-    <div id="approval"></div>
-    <div id="promptbar" style="display:none;background:#161c2b;border:1px solid #26304a;border-radius:10px;padding:10px;">
-      <div class="label" id="promptlabel">Input</div>
-      <div style="display:flex;gap:8px;">
-        <input id="prompttext" style="flex:1;padding:7px 9px;border-radius:6px;border:1px solid #26304a;background:#0b101a;color:#fff;" placeholder="type a menu option / response, then Enter" />
-        <button id="promptsend" style="padding:7px 14px;border-radius:6px;border:0;background:#c89a00;color:#1a1a1a;font-weight:600;cursor:pointer;">Send</button>
-      </div>
-    </div>
-    <div>
-      <div class="label">Artifacts</div>
-      <div id="artifacts"><span class="ph" style="color:#566">none yet</span></div>
-    </div>
-    <div id="log"></div>
-  </div>
-</main>
+<div id="root"></div>
 
-<script src="/dashboard_parser.js"></script>
-<script>
-  const $ = (s) => document.querySelector(s);
-  const stagesOrder = ["jira","reqs","doc","dremio","qlik"];
-  let activeStage = null, startTimes = {}, ws = null;
-
-  function setStatus(t){ $("#status").textContent = t; }
-  function stageEl(name){ return document.querySelector('.stage[data-stage="'+name+'"]'); }
-  function setStage(name, st){
-    const el = stageEl(name); if(!el) return;
-    el.dataset.st = st;
-    if(st === "running"){ activeStage = name; startTimes[name] = Date.now();
-      document.querySelectorAll(".stage").forEach(s=>s.classList.remove("active"));
-      el.classList.add("active"); }
-    if(st === "done" || st === "fail"){
-      const ms = startTimes[name] ? (Date.now()-startTimes[name]) : 0;
-      el.querySelector(".t").textContent = ms ? (ms/1000).toFixed(1)+"s" : "";
+<script type="importmap">
+{
+    "imports": {
+        "react": "https://esm.sh/react@18.2.0",
+        "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
+        "framer-motion": "https://esm.sh/framer-motion@10.16.4?deps=react@18.2.0,react-dom@18.2.0",
+        "lucide-react": "https://esm.sh/lucide-react@0.292.0?deps=react@18.2.0"
     }
-  }
-  function logLine(text, cls){
-    const log = $("#log"); const div = document.createElement("div");
-    if(cls) div.className = cls; div.textContent = text;
-    log.appendChild(div); log.scrollTop = log.scrollHeight;
-  }
-  function sendWs(data){
-    if(!ws || ws.readyState !== WebSocket.OPEN){ setStatus("not connected — wait a moment"); return false; }
-    ws.send(data); return true;
-  }
-  function addArtifact(kind, value){
-    const box = $("#artifacts");
-    const ph = box.querySelector(".ph"); if(ph) ph.remove();   // clear only the placeholder, keep prior chips
-    const chip = document.createElement("span"); chip.className = "chip";
-    const isUrl = /^https?:\/\//.test(value);
-    chip.innerHTML = (kind+": ") + (isUrl ? '<a href="'+value+'" target="_blank">'+value+'</a>' : value);
-    box.appendChild(chip);
-  }
-  function showApproval(kind, detail){
-    const a = $("#approval");
-    a.innerHTML = '⚠ Approve <b>'+kind+'</b>: '+detail +
-      '<div class="btns"><button class="approve">Approve</button><button class="reject">Reject</button></div>';
-    a.classList.add("show");
-    setStage(kind === "dremio" ? "dremio" : "qlik", "waiting");
-    a.querySelector(".approve").onclick = ()=>{ if(sendWs("y")) a.classList.remove("show"); };
-    a.querySelector(".reject").onclick  = ()=>{ if(sendWs("n")) a.classList.remove("show"); };
-  }
-  function showPrompt(text){
-    $("#promptlabel").textContent = (text||"Input").trim() || "Input";
-    $("#promptbar").style.display = "block";
-    const t = $("#prompttext"); t.value = ""; t.focus();
-  }
-  function hidePrompt(){ $("#promptbar").style.display = "none"; }
-  function sendPrompt(){
-    const t = $("#prompttext");
-    if(sendWs(t.value)){ logLine("> "+t.value); t.value=""; hidePrompt(); }
-  }
-  function resetUI(){
-    stagesOrder.forEach(n=>{ const el=stageEl(n); el.dataset.st="pending"; el.querySelector(".t").textContent=""; });
-    $("#log").innerHTML=""; $("#artifacts").innerHTML='<span class="ph" style="color:#566">none yet</span>';
-    $("#approval").classList.remove("show"); hidePrompt(); startTimes={}; activeStage=null;
-  }
-  function handle(msg){
-    if(msg.type === "error"){ if(activeStage) setStage(activeStage,"fail"); logLine(msg.message,"err"); return; }
-    if(msg.type === "done"){ setStatus("complete"); hidePrompt(); return; }
-    if(msg.type === "prompt"){ logLine(msg.message); showPrompt(msg.message); return; } // bridged input(): show input box
-    // type === "log": could be a marker or body text
-    const p = parseMarker(msg.message);
-    if(p.kind === "stage") setStage(p.name, p.status === "start" ? "running" : (p.status === "done" ? "done" : "fail"));
-    else if(p.kind === "artifact") addArtifact(p.artifactKind, p.value);
-    else if(p.kind === "approve") showApproval(p.approveKind, p.detail);
-    else if(p.kind === "done") setStatus("complete");
-    else logLine(p.text);
-  }
-  function connect(){
-    ws = new WebSocket((location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/ws");
-    ws.onopen = ()=> setStatus("connected");
-    ws.onclose = ()=> setStatus("disconnected");
-    ws.onerror = ()=> setStatus("connection error — see console");
-    ws.onmessage = (e)=>{ try { handle(JSON.parse(e.data)); } catch(_) { logLine(e.data); } };
-  }
-  $("#run").onclick = ()=>{
-    const key = $("#key").value.trim(); if(!key) return;
-    resetUI(); if(sendWs(JSON.stringify({action:"start", mode:"ticket", key}))) setStatus("running "+key);
-  };
-  $("#browse").onclick = ()=>{ resetUI(); if(sendWs(JSON.stringify({action:"start", mode:"browse"}))) setStatus("browse"); };
-  $("#promptsend").onclick = sendPrompt;
-  $("#prompttext").addEventListener("keydown", (e)=>{ if(e.key === "Enter") sendPrompt(); });
-  connect();
+}
+</script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script type="text/babel" data-type="module">
+import React,{useState,useEffect,useRef}from'react';
+import{createRoot}from'react-dom/client';
+import{motion}from'framer-motion';
+import{Activity,RefreshCw}from'lucide-react';
+
+// ─── NODE LAYOUT ─────────────────────────────────────────────────────────────
+// Single centered column for jira→doc→dremio, qlik to the right of dremio, git below qlik
+const NODES_INIT = [
+    {id:'jira',  label:'Jira Agent',    icon:'https://cdn.worldvectorlogo.com/logos/jira-3.svg',                             x:310, y:50,  theme:'from-blue-400 to-blue-600',   color:'#3B82F6', status:'pending', time:'-'},
+    {id:'doc',   label:'Documentation', icon:'https://cdn-icons-png.flaticon.com/512/3979/3979305.png',                       x:310, y:300, theme:'from-emerald-400 to-emerald-600', color:'#10B981', status:'pending', time:'-'},
+    {id:'dremio',label:'Dremio Agent',  icon:'https://www.vectorlogo.zone/logos/dremio/dremio-icon.svg',                      x:310, y:550, theme:'from-orange-400 to-orange-600',  color:'#F97316', status:'pending', time:'-'},
+    {id:'qlik',  label:'Qlik Agent',    icon:'https://images.icon-icons.com/2107/PNG/512/file_type_qlikview_icon_130217.png', x:680, y:550, theme:'from-green-400 to-green-600',    color:'#22C55E', status:'pending', time:'-'},
+    {id:'git',   label:'GitHub Agent',  icon:'https://cdn.worldvectorlogo.com/logos/github-icon-1.svg',                       x:680, y:800, theme:'from-purple-400 to-purple-600',  color:'#A855F7', status:'pending', time:'-'},
+];
+
+// ─── EDGES — one line per pair, direction controlled by state ─────────────────
+// Each edge has a fixed SVG path. We animate a plane FROM src TO tgt when active.
+// The "active" object holds: { edgeId, fromId, toId, color }
+// Only ONE edge can carry a plane at a time per pair. Direction flips as needed.
+const EDGE_DEFS = [
+    {id:'j-d',  a:'jira',  b:'doc',    type:'vert'},
+    {id:'d-dr', a:'doc',   b:'dremio', type:'vert'},
+    {id:'dr-q', a:'dremio',b:'qlik',   type:'horiz'},
+    {id:'q-g',  a:'qlik',  b:'git',    type:'vert'},
+    {id:'q-j',  a:'qlik',  b:'jira',   type:'curve'},  // shared line for qlik↔jira
+];
+
+// ─── SENTINEL MARKERS (our robust contract; ride the log channel) ────────────
+const _SENT_STAGE    = /^::STAGE\s+(\w+)\s+(start|done|fail)::$/;
+const _SENT_ARTIFACT = /^::ARTIFACT\s+(\w+)=(.*)::$/;
+const _SENT_APPROVE  = /^::APPROVE\s+(\w+)=(.*)::$/;
+const parseSentinel = (line) => {
+    const s = String(line).trim(); let m;
+    if((m=s.match(_SENT_STAGE)))    return {kind:'stage',    name:m[1], status:m[2]};
+    if((m=s.match(_SENT_ARTIFACT))) return {kind:'artifact', akind:m[1], value:m[2]};
+    if((m=s.match(_SENT_APPROVE)))  return {kind:'approve',  akind:m[1], detail:m[2]};
+    if(s==='::DONE::')              return {kind:'done'};
+    return null;
+};
+// our stage names → prototype node ids (reqs folds into the Jira agent)
+const STAGE_NODE   = {jira:'jira', reqs:'jira', doc:'doc', dremio:'dremio', qlik:'qlik'};
+const STAGE_STATUS = {start:'running', done:'completed', fail:'error'};
+
+// ─── TURBINE ─────────────────────────────────────────────────────────────────
+const TurbineSVG = ({spinning, idle}) => {
+    const cls = spinning ? 't-spinning' : idle ? 't-idle' : '';
+    return (
+        <svg viewBox="0 0 200 200" width="195" height="195" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+                <radialGradient id="tcg" cx="50%" cy="50%" r="50%">
+                    <stop offset="0%"   stopColor={spinning?"#ff9900":"#003f7d"}/>
+                    <stop offset="100%" stopColor={spinning?"#6b1f00":"#001833"}/>
+                </radialGradient>
+                <filter id="tfg"><feGaussianBlur in="SourceGraphic" stdDeviation="3" result="b"/>
+                <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+                <clipPath id="tcc"><circle cx="100" cy="100" r="87"/></clipPath>
+            </defs>
+            <circle cx="100" cy="100" r="95" fill="none" stroke="rgba(0,180,255,0.28)" strokeWidth="2"/>
+            <circle cx="100" cy="100" r="87" fill="#040d18"/>
+            <g clipPath="url(#tcc)">
+                <g className={`turb-blades ${cls}`} style={{transformOrigin:'100px 100px'}}>
+                    {Array.from({length:9}).map((_,i)=>{
+                        const a=(i*40)*Math.PI/180,r1=19,r2=75;
+                        const bc=spinning?`rgba(${175+i*7},${55+i*5},0,.9)`:`rgba(0,${95+i*10},${155+i*5},.85)`;
+                        const be=spinning?`rgba(255,${110+i*10},0,.55)`:`rgba(0,${155+i*7},255,.45)`;
+                        const ix1=100+r1*Math.cos(a-.25),iy1=100+r1*Math.sin(a-.25);
+                        const ix2=100+r1*Math.cos(a+.17),iy2=100+r1*Math.sin(a+.17);
+                        const ox1=100+r2*Math.cos(a+.44),oy1=100+r2*Math.sin(a+.44);
+                        const ox2=100+r2*Math.cos(a+.08),oy2=100+r2*Math.sin(a+.08);
+                        const c1x=100+42*Math.cos(a-.1),c1y=100+42*Math.sin(a-.1);
+                        const c2x=100+52*Math.cos(a+.53),c2y=100+52*Math.sin(a+.53);
+                        const d=`M${ix1} ${iy1} C${c1x} ${c1y},${c2x} ${c2y},${ox1} ${oy1} L${ox2} ${oy2} C${c2x} ${c2y},${ix2} ${iy2},${ix2} ${iy2}Z`;
+                        return <g key={i}><path d={d} fill={bc} stroke={be} strokeWidth=".5"/>
+                            <path d={`M${ix1} ${iy1} C${c1x} ${c1y},${c2x} ${c2y},${ox1} ${oy1}`} fill="none" stroke={spinning?"rgba(255,195,90,.32)":"rgba(110,205,255,.28)"} strokeWidth="1"/>
+                        </g>;
+                    })}
+                    <circle cx="100" cy="100" r="21" fill={spinning?"rgba(255,70,0,.55)":"rgba(0,70,152,.55)"} filter="url(#tfg)"/>
+                    <circle cx="100" cy="100" r="16" fill="#020810"/>
+                </g>
+            </g>
+            <circle cx="100" cy="100" r="13"  fill="url(#tcg)" filter="url(#tfg)"/>
+            <circle cx="100" cy="100" r="7"   fill={spinning?"#ff8800":"#0077bb"}/>
+            <circle cx="100" cy="100" r="3.5" fill="white" opacity=".92"/>
+            <circle cx="100" cy="100" r="80"  fill="none" stroke={spinning?"rgba(255,110,0,.38)":"rgba(0,180,255,.32)"} strokeWidth="2.5" strokeDasharray="7 4"/>
+            <text x="100" y="166" textAnchor="middle" fill={spinning?"rgba(255,175,0,.78)":"rgba(0,180,255,.68)"} fontFamily="Orbitron,monospace" fontSize="7.5" letterSpacing="3" fontWeight="600">{spinning?'AFTERBURNER':'IGNITE'}</text>
+            <text x="100" y="178" textAnchor="middle" fill={spinning?"rgba(255,135,0,.55)":"rgba(0,145,220,.48)"} fontFamily="Orbitron,monospace" fontSize="7" letterSpacing="2">{spinning?'ENGAGED':'AFTERBURNER'}</text>
+        </svg>
+    );
+};
+
+// ─── EDGE SVG ─────────────────────────────────────────────────────────────────
+// Returns path string for an edge given node positions
+// NODE_W=128 node box width, NODE_H=180 node box height
+const NW=128, NH=180;
+
+const getEdgePath = (edge, nodesMap) => {
+    const A = nodesMap[edge.a];
+    const B = nodesMap[edge.b];
+    if(!A||!B) return '';
+
+    if(edge.type==='vert'){
+        // bottom-center of A → top-center of B
+        const sx=A.x+NW/2, sy=A.y+NH;
+        const ex=B.x+NW/2, ey=B.y;
+        const midY=sy+(ey-sy)/2;
+        return `M${sx} ${sy} L${sx} ${midY} L${ex} ${midY} L${ex} ${ey}`;
+    }
+    if(edge.type==='horiz'){
+        // right-center of A → left-center of B (same row)
+        const sx=A.x+NW, sy=A.y+NH/2;
+        const ex=B.x,    ey=B.y+NH/2;
+        return `M${sx} ${sy} L${ex} ${ey}`;
+    }
+    if(edge.type==='curve'){
+        // Single curved line between qlik and jira (right side sweep)
+        const ax=A.x+NW, ay=A.y+NH/2;  // qlik right-mid
+        const bx=B.x+NW, by=B.y+NH/2;  // jira right-mid
+        const cx1=ax+170, cy1=ay;
+        const cx2=bx+190, cy2=by;
+        return `M${ax} ${ay} C${cx1} ${cy1},${cx2} ${cy2},${bx} ${by}`;
+    }
+    return '';
+};
+
+// Mini airplane — points in +X direction, animateMotion rotates it to path
+const Plane = ({color}) => (
+    <g transform="translate(-10,-5)">
+        {/* fuselage */}
+        <ellipse cx="10" cy="5" rx="9" ry="3" fill={color}/>
+        {/* nose cone */}
+        <ellipse cx="18" cy="5" rx="3" ry="2" fill={color}/>
+        {/* wings */}
+        <polygon points="10,5 6,0 15,3"  fill={color} opacity=".85"/>
+        <polygon points="10,5 6,10 15,7" fill={color} opacity=".85"/>
+        {/* tail fin */}
+        <polygon points="1,5 0,2 3,5"   fill={color} opacity=".7"/>
+        {/* engine glow */}
+        <ellipse cx="-1" cy="5" rx="4" ry="2" fill={color} opacity=".4" style={{filter:'blur(2px)'}}/>
+    </g>
+);
+
+// Edge component — always renders the static line; if active renders plane
+const Edge = ({edge, nodesMap, activePlane}) => {
+    const path = getEdgePath(edge, nodesMap);
+    if(!path) return null;
+
+    // activePlane: {edgeId, fromId, toId, color}  — fromId/toId determine direction
+    const isActive = activePlane && activePlane.edgeId === edge.id;
+    // If from=b→a we reverse the path for the plane (fly backwards along same line)
+    const planeReversed = isActive && activePlane.fromId === edge.b;
+    // Build reversed path string by swapping M endpoint and reversing bezier
+    const planePath = planeReversed ? reversePath(path, edge, nodesMap) : path;
+    const planeColor = isActive ? activePlane.color : '#3B82F6';
+
+    return (
+        <g>
+            {/* Static base line — always shown */}
+            <path d={path} stroke="rgba(255,255,255,0.13)" strokeWidth="1.8" fill="none" strokeDasharray={isActive?"none":"6 5"}/>
+            {/* Glow when active */}
+            {isActive && <path d={path} stroke={planeColor} strokeWidth="2" fill="none" opacity=".45"
+                style={{filter:`drop-shadow(0 0 5px ${planeColor})`}}/>}
+            {/* Flying plane */}
+            {isActive && (
+                <g style={{filter:`drop-shadow(0 0 4px ${planeColor})`}}>
+                    <animateMotion dur="2s" repeatCount="indefinite" path={planePath} rotate="auto"/>
+                    <Plane color={planeColor}/>
+                </g>
+            )}
+        </g>
+    );
+};
+
+// Reverse a path so the plane flies the other direction along same line
+const reversePath = (path, edge, nodesMap) => {
+    const A = nodesMap[edge.a];
+    const B = nodesMap[edge.b];
+    if(!A||!B) return path;
+    if(edge.type==='vert'){
+        const sx=B.x+NW/2, sy=B.y+NH;   // now B is source
+        const ex=A.x+NW/2, ey=A.y;
+        const midY=sy+(ey-sy)/2;
+        return `M${sx} ${sy} L${sx} ${midY} L${ex} ${midY} L${ex} ${ey}`;
+    }
+    if(edge.type==='horiz'){
+        const sx=B.x, sy=B.y+NH/2;
+        const ex=A.x+NW, ey=A.y+NH/2;
+        return `M${sx} ${sy} L${ex} ${ey}`;
+    }
+    if(edge.type==='curve'){
+        // reverse: jira → qlik
+        const ax=B.x+NW, ay=B.y+NH/2;  // jira right
+        const bx=A.x+NW, by=A.y+NH/2;  // qlik right
+        const cx1=ax+190, cy1=ay;
+        const cx2=bx+170, cy2=by;
+        return `M${ax} ${ay} C${cx1} ${cy1},${cx2} ${cy2},${bx} ${by}`;
+    }
+    return path;
+};
+
+// ─── AGENT ROBOT (original style) ─────────────────────────────────────────────
+const AgentRobot = ({node}) => {
+    const isRunning = node.status==='running';
+    const isHealing = node.status==='healing';
+    const isDone    = node.status==='completed';
+    const isError   = node.status==='error';
+
+    const pc = isError?'#EF4444':isDone?'#10B981':isHealing?'#F59E0B':
+               isRunning?node.color:'#6B7280';
+
+    return (
+        <div style={{position:'relative', display:'flex', flexDirection:'column', alignItems:'center', width:128}}>
+
+            {/* ── NEO GLOW (behind robot, only when running/done) ── */}
+            {(isRunning||isDone) && (
+                <div style={{
+                    position:'absolute', top:'50%', left:'50%',
+                    transform:'translate(-50%,-60%)',
+                    width: isRunning?260:200, height: isRunning?260:200,
+                    borderRadius:'50%',
+                    background:`radial-gradient(circle, ${node.color}${isRunning?'55':'28'} 0%, transparent 68%)`,
+                    pointerEvents:'none', zIndex:0,
+                    animation: isRunning?'neo-pulse 2s ease-in-out infinite':'none',
+                }}>
+                    {isRunning && (
+                        <div style={{
+                            position:'absolute', inset:0, borderRadius:'50%',
+                            border:`2px solid ${node.color}60`,
+                            animation:'neo-ring 2s ease-out infinite',
+                        }}/>
+                    )}
+                </div>
+            )}
+
+            <motion.div
+                animate={{y:[0,-12,0]}}
+                transition={{duration:3.5,repeat:Infinity,ease:'easeInOut'}}
+                style={{position:'relative',zIndex:1,width:96,display:'flex',flexDirection:'column',alignItems:'center'}}
+            >
+                {/* Antenna */}
+                <div style={{width:4,height:16,background:'#475569',borderRadius:'2px 2px 0 0',position:'relative',zIndex:0}}>
+                    <motion.div animate={{opacity:[0.3,1,0.3]}} transition={{duration:1.5,repeat:Infinity}}
+                        style={{position:'absolute',top:-8,left:-4,width:12,height:12,borderRadius:'50%',background:pc,boxShadow:`0 0 10px ${pc}`}}/>
+                </div>
+
+                {/* Head */}
+                <motion.div
+                    animate={isRunning?{rotateY:[-10,10,-10]}:{}}
+                    transition={{duration:2,repeat:Infinity,ease:'easeInOut'}}
+                    className={`bg-gradient-to-b ${node.theme} rounded-[20px] border-b-4 border-black/30 shadow-[0_5px_15px_rgba(0,0,0,0.5)] z-10 flex items-center justify-center`}
+                    style={{width:64,height:48}}
+                >
+                    <div style={{width:48,height:20,background:'#0f172a',borderRadius:9999,display:'flex',alignItems:'center',justifyContent:'center',overflow:'hidden',border:'1px solid #334155',boxShadow:'inset 0 2px 4px rgba(0,0,0,0.5)'}}>
+                        {isRunning ? (
+                            <motion.div animate={{x:[-12,12,-12]}} transition={{duration:1.5,repeat:Infinity,ease:'linear'}}
+                                style={{width:16,height:8,borderRadius:9999,background:pc,boxShadow:`0 0 10px ${pc}`}}/>
+                        ) : isHealing ? (
+                            <motion.div animate={{rotate:360}} transition={{duration:2,repeat:Infinity,ease:'linear'}}
+                                style={{width:12,height:12,borderRadius:'50%',border:`2px dashed ${pc}`}}/>
+                        ) : (
+                            <div style={{width:24,height:8,display:'flex',justifyContent:'space-between'}}>
+                                <div style={{width:8,height:8,borderRadius:'50%',background:pc,boxShadow:`0 0 8px ${pc}`}}/>
+                                <div style={{width:8,height:8,borderRadius:'50%',background:pc,boxShadow:`0 0 8px ${pc}`}}/>
+                            </div>
+                        )}
+                    </div>
+                </motion.div>
+
+                {/* Neck */}
+                <div style={{width:16,height:8,background:'#475569',zIndex:0}}/>
+
+                {/* Body */}
+                <div className={`bg-gradient-to-b ${node.theme} rounded-3xl shadow-[0_10px_20px_rgba(0,0,0,0.6)] border-b-4 border-black/30`}
+                    style={{width:80,height:80,display:'flex',alignItems:'center',justifyContent:'center',position:'relative',zIndex:2}}>
+                    {/* Icon */}
+                    <div style={{width:48,height:48,background:'#0f172a',borderRadius:'50%',display:'flex',alignItems:'center',justifyContent:'center',overflow:'hidden',position:'relative',border:`2px solid ${pc}`,boxShadow:`inset 0 0 15px ${pc}40`}}>
+                        <img src={node.icon} alt={node.label} style={{width:28,height:28,objectFit:'contain',filter:node.id==='git'?'invert(1)':'none',position:'relative',zIndex:1}}/>
+                        {isRunning && <motion.div animate={{rotate:360}} transition={{duration:3,repeat:Infinity,ease:'linear'}}
+                            style={{position:'absolute',inset:0,borderRadius:'50%',border:'2px solid transparent',borderTopColor:'rgba(255,255,255,0.3)'}}/>}
+                    </div>
+                    {/* Arms */}
+                    <motion.div animate={{y:[0,-3,0]}} transition={{duration:2,repeat:Infinity,delay:.2}}
+                        className={`absolute bg-gradient-to-b ${node.theme} rounded-full shadow-md border-b-2 border-black/30`}
+                        style={{left:-12,top:16,width:16,height:40}}/>
+                    <motion.div animate={{y:[0,-3,0]}} transition={{duration:2,repeat:Infinity,delay:.5}}
+                        className={`absolute bg-gradient-to-b ${node.theme} rounded-full shadow-md border-b-2 border-black/30`}
+                        style={{right:-12,top:16,width:16,height:40}}/>
+                </div>
+
+                {/* Thruster */}
+                <div style={{width:32,height:12,background:'#334155',borderRadius:'0 0 8px 8px',zIndex:1}}/>
+                <motion.div
+                    animate={{height:isRunning?[15,25,15]:[10,15,10], opacity:[0.6,1,0.6]}}
+                    transition={{duration:.2,repeat:Infinity}}
+                    style={{width:24,borderRadius:'0 0 9999px 9999px',background:`linear-gradient(to bottom, ${pc}, transparent)`,filter:'blur(3px)',marginTop:-4}}
+                />
+            </motion.div>
+
+            {/* Label */}
+            <div style={{marginTop:24,display:'flex',flexDirection:'column',alignItems:'center',zIndex:10}}>
+                <span style={{fontWeight:700,fontSize:11,letterSpacing:2,color:'white',background:'rgba(0,0,0,0.6)',padding:'3px 12px',borderRadius:9999,border:'1px solid rgba(255,255,255,0.1)',backdropFilter:'blur(8px)',whiteSpace:'nowrap'}}>
+                    {node.label}
+                </span>
+                <span style={{fontSize:9,textTransform:'uppercase',fontWeight:700,letterSpacing:2,marginTop:4,padding:'1px 8px',borderRadius:3,background:'rgba(0,0,0,0.4)',color:pc,whiteSpace:'nowrap'}}>
+                    {node.status}{node.time&&node.time!=='-'?` (${node.time})`:''}
+                </span>
+            </div>
+        </div>
+    );
+};
+
+// ─── MAIN APP ─────────────────────────────────────────────────────────────────
+const App = () => {
+    const [nodes,setNodes]         = useState(NODES_INIT);
+    const [terminal,setTerminal]   = useState([]);
+    const [prompt,setPrompt]       = useState(null);
+    const [inputVal,setInputVal]   = useState('');
+    const [wsState,setWsState]     = useState('connecting');
+    const [activePlane,setActivePlane] = useState(null);
+    const [ticketKey,setTicketKey]     = useState('');
+    const ws         = useRef(null);
+    const termEndRef = useRef(null);
+    const nodesRef   = useRef(nodes);
+
+    useEffect(()=>{ nodesRef.current = nodes; }, [nodes]);
+    useEffect(()=>{ termEndRef.current?.scrollIntoView({behavior:'smooth'}); }, [terminal,prompt]);
+
+    const addLine   = t       => setTerminal(p=>[...p,t]);
+    const upNode    = (id,u)  => setNodes(ns=>ns.map(n=>n.id===id?{...n,...u}:n));
+    const flyPlane  = (edgeId,fromId,toId,color) => setActivePlane({edgeId,fromId,toId,color});
+    const stopPlane = ()      => setActivePlane(null);
+
+    // Drive nodes from our sentinel markers (robust; preferred over log-string matching)
+    const applyMarker = (mk) => {
+        if(mk.kind==='stage'){
+            const node = STAGE_NODE[mk.name];
+            if(node){
+                upNode(node, {status:STAGE_STATUS[mk.status], time:mk.status==='start'?'...':'Done'});
+                if(mk.status==='done'){
+                    if(node==='jira')        flyPlane('j-d','jira','doc','#3B82F6');
+                    else if(node==='doc')    flyPlane('d-dr','doc','dremio','#10B981');
+                    else if(node==='dremio') flyPlane('dr-q','dremio','qlik','#F97316');
+                    else if(node==='qlik')   flyPlane('q-g','qlik','git','#22C55E');
+                }
+            }
+            addLine(`▸ ${mk.name} ${mk.status}`);
+        } else if(mk.kind==='artifact'){
+            addLine(`📎 ${mk.akind}: ${mk.value}`);
+        } else if(mk.kind==='approve'){
+            upNode(mk.akind==='dremio'?'dremio':'qlik', {status:'waiting'});
+            addLine(`⚠ approve ${mk.akind}: ${mk.detail}`);
+        } else if(mk.kind==='done'){
+            stopPlane(); setWsState('done');
+        }
+    };
+
+    // Quick-run by ticket key → run_ticket on the backend (typed start payload)
+    const runTicket = () => {
+        if(wsState!=='ready_to_start' || !ticketKey.trim()) return;
+        ws.current.send(JSON.stringify({action:'start', mode:'ticket', key:ticketKey.trim()}));
+        setWsState('processing');
+    };
+
+    // ── Direct WebSocket — simple and reliable ─────────────────────────────────
+    useEffect(() => {
+        ws.current = new WebSocket('ws://localhost:8000/ws');
+
+        ws.current.onopen = () => setWsState('ready_to_start');
+
+        ws.current.onclose = () => setWsState('disconnected');
+
+        ws.current.onmessage = (event) => {
+            let data;
+            try { data = JSON.parse(event.data); } catch(e) { return; }
+
+            if (data.type === 'log') {
+                const _mk = parseSentinel(data.message);
+                if (_mk) { applyMarker(_mk); return; }   // robust marker path — don't show the raw marker line
+                addLine(data.message);
+                const m = data.message;
+                // JIRA
+                if (m.includes('Jira Agent analyzing ticket')) {
+                    const qn = nodesRef.current.find(n=>n.id==='qlik');
+                    if (qn && qn.status==='running') flyPlane('q-j','qlik','jira','#22C55E');
+                    upNode('jira', {status:'running', time:'...'});
+                }
+                if (m.includes('TICKET REQUIREMENTS')) {
+                    upNode('jira', {status:'completed', time:'Done'});
+                    const qn = nodesRef.current.find(n=>n.id==='qlik');
+                    if (qn && qn.status==='running') flyPlane('q-j','jira','qlik','#3B82F6');
+                    else flyPlane('j-d','jira','doc','#3B82F6');
+                }
+                // DOC
+                if (m.includes('DOCUMENTATION AGENT')) upNode('doc', {status:'running', time:'...'});
+                if (m.includes('Document saved:')) {
+                    upNode('doc', {status:'completed', time:'Done'});
+                    flyPlane('d-dr','doc','dremio','#10B981');
+                }
+                // DREMIO
+                if (m.includes('DREMIO AGENT'))    upNode('dremio', {status:'running', time:'...'});
+                if (m.includes('Validation FAILED')) upNode('dremio', {status:'error'});
+                if (m.includes('Intercepting error') || m.includes('auto-fix') || m.includes('Rewriting SQL')) upNode('dremio', {status:'healing'});
+                if (m.includes('VDS created successfully')) {
+                    upNode('dremio', {status:'completed', time:'Done'});
+                    flyPlane('dr-q','dremio','qlik','#F97316');
+                }
+                // QLIK
+                if (m.includes('QLIK AGENT')) upNode('qlik', {status:'running', time:'...'});
+                if (m.includes('separate JIRA ticket for Qlik?') && nodesRef.current.find(n=>n.id==='qlik')?.status==='running') {
+                    flyPlane('q-j','qlik','jira','#22C55E');
+                }
+                if (m.includes('QLIK SENSE DASHBOARD READY')) {
+                    upNode('qlik', {status:'completed', time:'Done'});
+                    flyPlane('q-g','qlik','git','#22C55E');
+                }
+                // GIT
+                if (m.includes('GITHUB AGENT') || m.includes('Validating local codebase')) upNode('git', {status:'running', time:'...'});
+                if (m.includes('WORKFLOW COMPLETE')) { upNode('git', {status:'completed', time:'Done'}); stopPlane(); }
+
+            } else if (data.type === 'prompt') {
+                setPrompt(data.message);
+                setWsState('waiting_input');
+                if (data.message.includes('Select option') || data.message.includes('Select sprint') ||
+                    data.message.includes('Select ticket') || data.message.includes('Select assignee')) {
+                    upNode('jira', {status:'waiting'});
+                }
+            } else if (data.type === 'error') {
+                addLine(`[SYSTEM ERROR] ${data.message}`);
+            } else if (data.type === 'done') {
+                setWsState('done'); stopPlane();
+            }
+        };
+
+        return () => ws.current.close();
+    }, []);
+
+    const handleSubmit = e => {
+        e.preventDefault();
+        if (!prompt || !inputVal.trim()) return;
+        addLine('  → ' + inputVal);
+        ws.current.send(inputVal);
+        setInputVal(''); setPrompt(null); setWsState('processing');
+        setNodes(ns => ns.map(n => n.status==='waiting' ? {...n, status:'pending'} : n));
+    };
+    const isSpinning = ['processing','waiting_input'].includes(wsState);
+    const nodesMap   = Object.fromEntries(nodes.map(n=>[n.id,n]));
+
+    return (
+        <div style={{display:'flex',height:'100vh',width:'100vw',overflow:'hidden',background:'#050505'}}>
+
+            {/* ── LEFT CANVAS ── */}
+            <div style={{flex:1,position:'relative',display:'flex',flexDirection:'column',overflow:'hidden'}} className="grid-bg">
+                <video autoPlay loop muted playsInline className="video-bg">
+                    <source src="/image/asl_airlines_edited.mp4" type="video/mp4"/>
+                </video>
+
+                {/* Header */}
+                <div className="glass" style={{height:56,display:'flex',alignItems:'center',padding:'0 24px',justifyContent:'space-between',borderBottom:'1px solid rgba(255,255,255,0.08)',position:'relative',zIndex:20}}>
+                    <div style={{display:'flex',alignItems:'center',gap:16}}>
+                        <img src="https://aslairlines.be/wp-content/uploads/2022/09/asl_belgium_white_logo.png" alt="ASL" style={{height:22,objectFit:'contain'}}/>
+                        <h1 style={{fontWeight:600,fontSize:14,letterSpacing:1,color:'#e2e8f0'}}>DataLake Workflow Orchestrator</h1>
+                    </div>
+                    <div style={{display:'flex',alignItems:'center',gap:12}}>
+                        <input value={ticketKey} onChange={e=>setTicketKey(e.target.value)}
+                            onKeyDown={e=>{if(e.key==='Enter')runTicket();}} placeholder="ADL-1729"
+                            style={{width:120,padding:'6px 10px',borderRadius:6,border:'1px solid rgba(255,255,255,0.12)',background:'rgba(255,255,255,0.05)',color:'#e2e8f0',fontSize:12,outline:'none'}}/>
+                        <button onClick={runTicket} disabled={wsState!=='ready_to_start'}
+                            style={{fontSize:12,color:'#050505',background:'#00b4ff',padding:'6px 14px',borderRadius:6,border:0,fontWeight:600,cursor:wsState==='ready_to_start'?'pointer':'not-allowed',opacity:wsState==='ready_to_start'?1:.4}}>Run</button>
+                        <div style={{display:'flex',gap:6}}>
+                            {[['disconnected','#ef4444'],['connecting','#f59e0b'],['ready_to_start','#10b981']].map(([s,c])=>{
+                                const on=(s===wsState)||(s==='ready_to_start'&&['processing','waiting_input','done'].includes(wsState));
+                                return <div key={s} style={{width:12,height:12,borderRadius:'50%',background:on?c:`${c}30`,boxShadow:on?`0 0 10px ${c}`:'none',transition:'all .3s'}}/>;
+                            })}
+                        </div>
+                        <button onClick={()=>window.location.reload()} style={{display:'flex',alignItems:'center',gap:6,fontSize:12,color:'#94a3b8',background:'rgba(255,255,255,0.05)',padding:'6px 12px',borderRadius:6,border:'1px solid rgba(255,255,255,0.1)',cursor:'pointer'}}>
+                            <RefreshCw size={13}/> Restart
+                        </button>
+                    </div>
+                </div>
+
+                {/* Canvas */}
+                <div style={{flex:1,position:'relative',overflow:'auto',zIndex:10}}>
+                    <div style={{position:'relative',minWidth:1050,minHeight:1200,padding:40}}>
+                        {/* Edges SVG layer */}
+                        <svg style={{position:'absolute',inset:0,width:'100%',height:'100%',pointerEvents:'none',zIndex:0}}>
+                            <defs>
+                                <filter id="ef">
+                                    <feGaussianBlur in="SourceGraphic" stdDeviation="2.5" result="b"/>
+                                    <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+                                </filter>
+                            </defs>
+                            {EDGE_DEFS.map(edge=>(
+                                <Edge key={edge.id} edge={edge} nodesMap={nodesMap} activePlane={activePlane}/>
+                            ))}
+                        </svg>
+                        {/* Nodes */}
+                        {nodes.map(node=>(
+                            <motion.div key={node.id}
+                                style={{position:'absolute',left:node.x,top:node.y,zIndex:10}}
+                                initial={{opacity:0,scale:.9}} animate={{opacity:1,scale:1}}>
+                                <AgentRobot node={node}/>
+                            </motion.div>
+                        ))}
+                    </div>
+                </div>
+            </div>
+
+            {/* ── RIGHT CONSOLE PANEL ── */}
+            <div className="console-panel">
+
+                {/* Turbine engine button */}
+                <div className="engine-panel">
+                    <div className="engine-label">Engine Control Unit</div>
+                    <motion.button className="turb-btn"
+                        onClick={()=>{if(wsState==='ready_to_start'){ws.current.send("START_WORKFLOW");setWsState("processing");}}}
+                        disabled={wsState!=='ready_to_start'}
+                        whileHover={wsState==='ready_to_start'?{scale:1.05}:{}}
+                        animate={isSpinning?{x:[-1,1,-1,1,0],y:[-1,1,-1,1,0]}:{}}
+                        transition={isSpinning?{duration:.1,repeat:Infinity}:{}}
+                        style={{
+                            borderRadius:'50%', padding:6,
+                            background:isSpinning?'radial-gradient(circle,rgba(255,80,0,.15) 0%,transparent 70%)':'radial-gradient(circle,rgba(0,80,160,.15) 0%,transparent 70%)',
+                            boxShadow:isSpinning?'0 0 60px rgba(255,100,0,.3)':wsState==='ready_to_start'?'0 0 40px rgba(0,180,255,.2)':'none',
+                            opacity:wsState!=='ready_to_start'&&!isSpinning?.38:1,
+                        }}>
+                        <TurbineSVG spinning={isSpinning} idle={wsState==='ready_to_start'}/>
+                    </motion.button>
+
+                    {isSpinning && <motion.div style={{width:70,height:22,background:'radial-gradient(ellipse,rgba(255,110,0,.5) 0%,transparent 70%)',filter:'blur(6px)',marginTop:-6}}
+                        animate={{opacity:[.5,1,.5],scaleY:[1,1.5,1]}} transition={{duration:.15,repeat:Infinity}}/>}
+
+                    {/* Status + RPM */}
+                    <div style={{display:'flex',alignItems:'center',gap:8,marginTop:10}}>
+                        <motion.div style={{width:8,height:8,borderRadius:'50%',background:isSpinning?'#F97316':wsState==='ready_to_start'?'#00b4ff':'#374151'}}
+                            animate={isSpinning?{opacity:[1,.2,1]}:wsState==='ready_to_start'?{opacity:[1,.5,1]}:{}}
+                            transition={{duration:isSpinning?.3:2,repeat:Infinity}}/>
+                        <span style={{fontFamily:'Orbitron,monospace',fontSize:9,letterSpacing:'2.5px',color:isSpinning?'#F97316':wsState==='ready_to_start'?'#00b4ff':'#374151'}}>
+                            {isSpinning?'AFTERBURNER ENGAGED':wsState==='ready_to_start'?'TURBINE STANDBY':wsState==='done'?'CYCLE COMPLETE':'OFFLINE'}
+                        </span>
+                    </div>
+                    <div style={{display:'flex',gap:3,marginTop:10}}>
+                        {Array.from({length:20}).map((_,i)=>(
+                            <motion.span key={i} className="rpm-bar"
+                                style={{background:isSpinning?(i<10?'#10B981':i<15?'#F59E0B':'#EF4444'):(i<3?'#00b4ff':'rgba(255,255,255,0.07)')}}
+                                animate={isSpinning&&i>=13?{opacity:[1,.3,1]}:{}} transition={{duration:.1+i*.02,repeat:Infinity}}/>
+                        ))}
+                    </div>
+                </div>
+
+                {/* Executive Event Log header */}
+                <div style={{padding:'8px 18px',borderBottom:'1px solid rgba(0,180,255,0.14)',background:'rgba(0,180,255,0.03)',display:'flex',alignItems:'center',gap:8}}>
+                    <Activity size={13} color="#00b4ff"/>
+                    <span style={{fontFamily:'Orbitron,monospace',fontSize:8,letterSpacing:'3px',textTransform:'uppercase',color:'rgba(0,180,255,0.7)'}}>Executive Event Log</span>
+                    <span style={{marginLeft:'auto',fontFamily:'JetBrains Mono',fontSize:10,color:'rgba(0,180,255,0.3)'}}>{terminal.length} LINES</span>
+                </div>
+
+                {/* Terminal body */}
+                <div style={{flex:1,overflowY:'auto',padding:12,display:'flex',flexDirection:'column',gap:4}}>
+                    {terminal.length===0 && (
+                        <div className="t-empty">
+                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#00b4ff" strokeWidth="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                            <div className="t-empty-lbl">AWAITING PIPELINE ACTIVATION</div>
+                        </div>
+                    )}
+                    {terminal.map((line,i)=>{
+                        const isSep = line.startsWith('===');
+                        const isHdr = !isSep && (line.includes('AGENT')||line.includes('WORKFLOW')||line.includes('ASL AIRLINES'));
+                        const isErr = line.startsWith('[SYSTEM ERROR]');
+                        const cls   = `t-line${isSep?' t-sep':isHdr?' t-hdr':isErr?' t-err':''}`;
+                        return (
+                            <div key={i} className={cls}>
+                                {!isSep && !isHdr && !isErr && <span style={{color:'rgba(0,180,255,0.28)',marginRight:6}}>›</span>}
+                                {line}
+                            </div>
+                        );
+                    })}
+
+                    {/* Prompt input */}
+                    {prompt && (
+                        <motion.div initial={{opacity:0,y:6}} animate={{opacity:1,y:0}} className="t-prompt-wrap">
+                            <span className="t-prompt-text">{prompt}</span>
+                            <form style={{flex:1,display:'flex',alignItems:'center',gap:6}} onSubmit={handleSubmit}>
+                                <input autoFocus className="t-prompt-input" value={inputVal}
+                                    onChange={e=>setInputVal(e.target.value)} placeholder="input..."/>
+                                <div className="t-cursor"/>
+                            </form>
+                        </motion.div>
+                    )}
+                    <div ref={termEndRef}/>
+                </div>
+
+                {/* Footer */}
+                <div style={{padding:'6px 18px',borderTop:'1px solid rgba(0,180,255,0.12)',background:'rgba(0,0,0,0.55)',display:'flex',justifyContent:'space-between'}}>
+                    <span style={{fontFamily:'Orbitron,monospace',fontSize:7.5,letterSpacing:'2.5px',color:'rgba(0,180,255,0.3)'}}>DnT INFOTECH</span>
+                    <span style={{fontFamily:'Orbitron,monospace',fontSize:7.5,letterSpacing:'2.5px',color:'rgba(0,180,255,0.3)'}}>ADL PIPELINE v5.0</span>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+createRoot(document.getElementById('root')).render(<App/>);
 </script>
 </body>
 </html>
