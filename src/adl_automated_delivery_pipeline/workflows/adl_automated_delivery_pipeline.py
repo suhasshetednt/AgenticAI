@@ -39,6 +39,7 @@ from adl_automated_delivery_pipeline.agents.dremio_agent import DremioAgent
 from adl_automated_delivery_pipeline.agents.doc_agent import DocumentationAgent
 from adl_automated_delivery_pipeline.agents.qlik_agent import QlikAgent
 from adl_automated_delivery_pipeline.state import make_initial_state
+from adl_automated_delivery_pipeline.workflows import _events as ev
 
 logger = logging.getLogger(__name__)
 
@@ -1688,6 +1689,67 @@ def _post_workflow_git_check() -> None:
             print(f"\n{res.get('output', 'Done.')}\n")
     except (subprocess.CalledProcessError, OSError) as e:
         print(f" (Failed to check git status: {e})")
+
+
+# ── Headless dashboard runner ────────────────────────────────────────────────────
+
+def run_ticket(key: str, start_at: str = "jira") -> None:
+    """Headless dashboard runner: execute the full pipeline for one ticket key,
+    emitting sentinel markers around each phase. v1 always starts at "jira";
+    ``start_at`` is accepted for a future resume feature but only "jira" runs.
+    """
+    ev.stage("jira", "start")
+    ticket = _fetch_ticket(key)
+    if ticket.get("status") != "SUCCESS":
+        print(f"  ERROR fetching {key}: {ticket.get('error')}")
+        ev.stage("jira", "fail")
+        ev.done()
+        return
+    ev.stage("jira", "done")
+
+    ev.stage("reqs", "start")
+    reqs = _extract_requirements(ticket)
+    if reqs is None:
+        print("  Could not extract requirements.")
+        ev.stage("reqs", "fail")
+        ev.done()
+        return
+    _display_requirements(reqs)
+    ev.stage("reqs", "done")
+
+    ev.stage("doc", "start")
+    doc_path = _doc_phase(reqs)
+    if doc_path is not None:
+        ev.artifact("docx", doc_path.as_posix())
+    ev.stage("doc", "done")
+
+    ev.approve("dremio", f"{reqs.ticket_id}: {reqs.summary}")
+    if _inp("Approve Dremio Agent (create/modify VDS)? [y/n]: ", required=False).lower() not in (
+        "y", "yes", "1",
+    ):
+        print("  Stopped before Dremio.")
+        ev.done()
+        return
+
+    ev.stage("dremio", "start")
+    vds_path = _dremio_phase(reqs)
+    if vds_path:
+        ev.artifact("vds", vds_path)
+        ev.stage("dremio", "done")
+    else:
+        ev.stage("dremio", "fail")
+        ev.done()
+        return
+
+    ev.approve("qlik", vds_path)
+    if _inp("Build QlikSense dashboard from this VDS? [y/n]: ", required=False).lower() in (
+        "y", "yes", "1",
+    ):
+        ev.stage("qlik", "start")
+        _qlik_phase(reqs, vds_path)
+        ev.stage("qlik", "done")
+
+    ev.done()
 
 
 # ── Main ────────────────────────────────────────────────────────────────────────
