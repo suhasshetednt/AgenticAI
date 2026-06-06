@@ -128,17 +128,31 @@ class WebSocketIO:
 
 ws_io = WebSocketIO()
 
-def run_pipeline():
-    """Runs the main pipeline in a separate thread so it doesn't block FastAPI"""
-    # Ensure the project root (the package parent) is importable.
+
+def _resolve_start(payload: dict) -> tuple[str, str | None]:
+    """Map a start payload to (mode, key). mode is 'ticket' or 'browse'."""
+    if payload.get("mode") == "ticket":
+        return ("ticket", payload.get("key"))
+    return ("browse", None)
+
+
+def run_pipeline(payload: dict) -> None:
+    """Runs the pipeline in a background thread. payload selects ticket vs browse."""
     module_dir = Path(__file__).resolve().parent.parent.parent  # project root
     if str(module_dir) not in sys.path:
         sys.path.insert(0, str(module_dir))
-    
+
     ws_io.enable()
     try:
-        from adl_automated_delivery_pipeline.workflows.adl_automated_delivery_pipeline import main
-        main()
+        mode, key = _resolve_start(payload)
+        from adl_automated_delivery_pipeline.workflows.adl_automated_delivery_pipeline import (
+            main,
+            run_ticket,
+        )
+        if mode == "ticket" and key:
+            run_ticket(key)
+        else:
+            main()
     except Exception as e:
         import traceback
         tb = traceback.format_exc()
@@ -150,17 +164,16 @@ def run_pipeline():
 
 @app.get("/")
 def get_dashboard():
-    """Serves the interactive dashboard HTML, if the optional docs dir is present."""
-    dashboard_path = (_DOCS_DIR / "ai_dashboard_prototype.html") if _DOCS_DIR else None
-    if not dashboard_path or not dashboard_path.is_file():
-        return HTMLResponse(
-            "<h1>ADL Automated Delivery Pipeline</h1>"
-            "<p>The interactive dashboard asset "
-            "(<code>docs/ai_dashboard_prototype.html</code>) was not found. "
-            "Copy the <code>docs/</code> directory into the project root to enable it.</p>",
-            status_code=200,
-        )
-    return HTMLResponse(dashboard_path.read_text(encoding="utf-8"))
+    """Serves the live pipeline dashboard HTML, if present in the docs dir."""
+    for name in ("pipeline_dashboard.html", "ai_dashboard_prototype.html"):
+        candidate = (_DOCS_DIR / name) if _DOCS_DIR else None
+        if candidate and candidate.is_file():
+            return HTMLResponse(candidate.read_text(encoding="utf-8"))
+    return HTMLResponse(
+        "<h1>ADL Live Pipeline Dashboard</h1>"
+        "<p>The dashboard asset (<code>docs/pipeline_dashboard.html</code>) was not found.</p>",
+        status_code=200,
+    )
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
@@ -183,22 +196,29 @@ async def websocket_endpoint(websocket: WebSocket):
             # When the UI submits an input response, push it to the input_queue to unblock custom_input()
             data = await websocket.receive_text()
             
+            start_payload: dict | None = None
             if data == "START_WORKFLOW":
+                start_payload = {"mode": "browse"}
+            else:
+                try:
+                    parsed = json.loads(data)
+                except (json.JSONDecodeError, TypeError):
+                    parsed = None
+                if isinstance(parsed, dict) and parsed.get("action") == "start":
+                    start_payload = parsed
+
+            if start_payload is not None:
                 global active_thread_id
-                
-                # Clear queues to prevent ghost threads from stealing inputs if the user restarted
                 while not input_queue.empty():
                     try: input_queue.get_nowait()
                     except queue.Empty: break
                 while not output_queue.empty():
                     try: output_queue.get_nowait()
                     except queue.Empty: break
-                    
-                # Start the LangGraph pipeline in a background thread only on manual trigger
-                t = threading.Thread(target=run_pipeline, daemon=True)
+
+                t = threading.Thread(target=run_pipeline, args=(start_payload,), daemon=True)
                 t.start()
                 active_thread_id = t.ident
-                
                 output_queue.put({"type": "log", "message": "Initiating workflow execution..."})
             else:
                 input_queue.put(data)
