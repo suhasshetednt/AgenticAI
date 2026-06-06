@@ -881,8 +881,11 @@ def _save_sql(reqs: TicketRequirements, sql: str) -> Path:
 
 # ── Documentation Agent phase ───────────────────────────────────────────────────
 
-def _doc_phase(reqs: TicketRequirements) -> None:
-    """Phase 2: Run DocumentationAgent to produce a Technical Implementation Document."""
+def _doc_phase(reqs: TicketRequirements) -> "Path | None":
+    """Phase 2: Run DocumentationAgent to produce a Technical Implementation Document.
+
+    Returns the saved .docx Path on success, or None if generation failed.
+    """
     _header("DOCUMENTATION AGENT  —  Technical Implementation Document")
     print("  Generating Technical Implementation Document from ticket requirements ...")
     print("  (This calls the configured LLM — may take 15–30 seconds)\n")
@@ -890,13 +893,16 @@ def _doc_phase(reqs: TicketRequirements) -> None:
         agent = DocumentationAgent()
         path = agent.generate(reqs)
         print(f"\n  Document saved: {path}")
-        print(f"  Open it in Word for review and sign-off.\n")
+        print("  Open it in Word for review and sign-off.\n")
+        return path
     except RuntimeError as exc:
         print(f"\n  WARNING: Documentation generation failed: {exc}")
         print("  Continuing to Dremio Agent ...\n")
+        return None
     except Exception as exc:
         print(f"\n  WARNING: Unexpected error during documentation: {exc}")
         print("  Continuing to Dremio Agent ...\n")
+        return None
 
 
 # ── Dremio folder path helper ────────────────────────────────────────────────────
