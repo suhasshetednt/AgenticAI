@@ -347,21 +347,29 @@ const AgentRobot = ({node}) => {
             {/* ── NEO GLOW (behind robot, only when running/done) ── */}
             {(isRunning||isDone) && (
                 <div style={{
+                    // Outer layer: CENTERING ONLY — this transform is never animated,
+                    // so the aura stays locked behind the robot.
                     position:'absolute', top:'50%', left:'50%',
                     transform:'translate(-50%,-60%)',
                     width: isRunning?260:200, height: isRunning?260:200,
-                    borderRadius:'50%',
-                    background:`radial-gradient(circle, ${node.color}${isRunning?'55':'28'} 0%, transparent 68%)`,
                     pointerEvents:'none', zIndex:0,
-                    animation: isRunning?'neo-pulse 2s ease-in-out infinite':'none',
                 }}>
-                    {isRunning && (
-                        <div style={{
-                            position:'absolute', inset:0, borderRadius:'50%',
-                            border:`2px solid ${node.color}60`,
-                            animation:'neo-ring 2s ease-out infinite',
-                        }}/>
-                    )}
+                    {/* Inner layer: the PULSE. neo-pulse animates transform:scale here,
+                        where it can't clobber the centering transform above (that was
+                        the desync bug — two transforms fighting on one element). */}
+                    <div style={{
+                        position:'absolute', inset:0, borderRadius:'50%',
+                        background:`radial-gradient(circle, ${node.color}${isRunning?'55':'28'} 0%, transparent 68%)`,
+                        animation: isRunning?'neo-pulse 2s ease-in-out infinite':'none',
+                    }}>
+                        {isRunning && (
+                            <div style={{
+                                position:'absolute', inset:0, borderRadius:'50%',
+                                border:`2px solid ${node.color}60`,
+                                animation:'neo-ring 2s ease-out infinite',
+                            }}/>
+                        )}
+                    </div>
                 </div>
             )}
 

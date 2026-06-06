@@ -42,6 +42,14 @@ output_queue = queue.Queue()
 # Track the active pipeline thread to kill ghost threads when restarting
 active_thread_id = None
 
+# Monotonic id of the most-recent /ws connection. The print/input bridge drives a
+# single interactive UI, but a browser may open more than one socket (e.g. a
+# duplicate mount). Without coordination, each connection's send loop competes to
+# drain the shared output_queue and prompts/logs get split — so the UI on the
+# newest socket silently misses messages. Only the newest connection is allowed
+# to drain the queue; older ones idle.
+active_ws_id = 0
+
 class QueueStdout:
     def __init__(self, queue):
         self.queue = queue
@@ -186,11 +194,20 @@ def get_parser_js():
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
+    global active_ws_id
     await websocket.accept()
-    
+    active_ws_id += 1
+    my_ws_id = active_ws_id  # newest connection becomes the sole queue drainer
+
     # Async task to continually push logs/prompts to the UI
     async def send_updates():
         while True:
+            # Only the newest connection drains the shared queue — otherwise two
+            # simultaneous sockets would each grab half the messages and the UI
+            # would miss prompts/logs.
+            if my_ws_id != active_ws_id:
+                await asyncio.sleep(0.1)
+                continue
             try:
                 # Non-blocking get
                 msg = output_queue.get_nowait()
