@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>ADL — Live Pipeline Dashboard</title>
+<style>
+  :root { --navy:#00386b; --gold:#c89a00; --bg:#0f1420; --panel:#161c2b; --line:#26304a; --ok:#1f9d55; --run:#caa300; --fail:#d14; --muted:#8aa; }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family:system-ui,Segoe UI,Arial,sans-serif; background:var(--bg); color:#e6ebf5; }
+  header { background:var(--navy); padding:12px 18px; display:flex; gap:10px; align-items:center; }
+  header h1 { font-size:15px; margin:0 16px 0 0; color:#fff; }
+  header input { flex:0 0 200px; padding:7px 9px; border-radius:6px; border:1px solid var(--line); background:#0b101a; color:#fff; }
+  header button { padding:7px 14px; border-radius:6px; border:0; background:var(--gold); color:#1a1a1a; font-weight:600; cursor:pointer; }
+  header button.secondary { background:#2a3350; color:#dfe6f5; }
+  #status { margin-left:auto; font-size:12px; color:var(--muted); }
+  main { display:flex; gap:14px; padding:14px; height:calc(100vh - 58px); }
+  #timeline { flex:0 0 230px; background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:10px; }
+  .stage { display:flex; align-items:center; gap:8px; padding:9px 8px; border-radius:8px; cursor:pointer; font-size:13px; }
+  .stage.active { background:#1d2740; }
+  .dot { width:12px; height:12px; border-radius:50%; border:2px solid #44506e; }
+  .stage[data-st="running"] .dot { background:var(--run); border-color:var(--run); animation:pulse 1s infinite; }
+  .stage[data-st="done"] .dot { background:var(--ok); border-color:var(--ok); }
+  .stage[data-st="fail"] .dot { background:var(--fail); border-color:var(--fail); }
+  .stage[data-st="waiting"] .dot { background:var(--gold); border-color:var(--gold); }
+  .stage .t { margin-left:auto; font-size:11px; color:var(--muted); }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.35} }
+  #detail { flex:1; display:flex; flex-direction:column; gap:10px; min-width:0; }
+  #approval { display:none; background:#1a1407; border:1px solid #4a3d12; border-radius:10px; padding:12px; }
+  #approval.show { display:block; }
+  #approval b { color:var(--gold); }
+  #approval .btns { margin-top:8px; display:flex; gap:8px; }
+  #approval button { padding:6px 14px; border-radius:6px; border:0; cursor:pointer; font-weight:600; }
+  .approve { background:var(--ok); color:#fff; } .reject { background:#3a2330; color:#f3c; }
+  #log { flex:1; overflow:auto; background:#05080f; border:1px solid var(--line); border-radius:10px; padding:10px; font-family:Consolas,monospace; font-size:12px; line-height:1.5; white-space:pre-wrap; color:#bfe6bf; }
+  #log .err { color:#ff8080; }
+  #artifacts { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:10px; min-height:42px; }
+  #artifacts .chip { display:inline-block; margin:3px; padding:5px 10px; border-radius:14px; background:#10203a; border:1px solid #2a4a78; font-size:12px; }
+  #artifacts a { color:#8fc6ff; text-decoration:none; }
+  .label { font-size:11px; text-transform:uppercase; letter-spacing:.5px; color:var(--muted); margin-bottom:4px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>ASL · Live Pipeline</h1>
+  <input id="key" placeholder="ADL-1729" />
+  <button id="run">Run</button>
+  <button id="browse" class="secondary">Browse</button>
+  <span id="status">disconnected</span>
+</header>
+<main>
+  <div id="timeline">
+    <div class="label">Pipeline</div>
+    <div class="stage" data-stage="jira"   data-st="pending"><span class="dot"></span> Jira fetch <span class="t"></span></div>
+    <div class="stage" data-stage="reqs"   data-st="pending"><span class="dot"></span> Extract reqs <span class="t"></span></div>
+    <div class="stage" data-stage="doc"    data-st="pending"><span class="dot"></span> Generate doc <span class="t"></span></div>
+    <div class="stage" data-stage="dremio" data-st="pending"><span class="dot"></span> Dremio VDS <span class="t"></span></div>
+    <div class="stage" data-stage="qlik"   data-st="pending"><span class="dot"></span> Qlik <span class="t"></span></div>
+  </div>
+  <div id="detail">
+    <div id="approval"></div>
+    <div>
+      <div class="label">Artifacts</div>
+      <div id="artifacts"><span style="color:#566">none yet</span></div>
+    </div>
+    <div id="log"></div>
+  </div>
+</main>
+
+<script src="/dashboard_parser.js"></script>
+<script>
+  const $ = (s) => document.querySelector(s);
+  const stagesOrder = ["jira","reqs","doc","dremio","qlik"];
+  let activeStage = null, startTimes = {}, ws = null;
+
+  function setStatus(t){ $("#status").textContent = t; }
+  function stageEl(name){ return document.querySelector('.stage[data-stage="'+name+'"]'); }
+  function setStage(name, st){
+    const el = stageEl(name); if(!el) return;
+    el.dataset.st = st;
+    if(st === "running"){ activeStage = name; startTimes[name] = Date.now();
+      document.querySelectorAll(".stage").forEach(s=>s.classList.remove("active"));
+      el.classList.add("active"); }
+    if(st === "done" || st === "fail"){
+      const ms = startTimes[name] ? (Date.now()-startTimes[name]) : 0;
+      el.querySelector(".t").textContent = ms ? (ms/1000).toFixed(1)+"s" : "";
+    }
+  }
+  function logLine(text, cls){
+    const log = $("#log"); const div = document.createElement("div");
+    if(cls) div.className = cls; div.textContent = text;
+    log.appendChild(div); log.scrollTop = log.scrollHeight;
+  }
+  function addArtifact(kind, value){
+    const box = $("#artifacts");
+    if(box.querySelector("span")) box.innerHTML = "";
+    const chip = document.createElement("span"); chip.className = "chip";
+    const isUrl = /^https?:\/\//.test(value);
+    chip.innerHTML = (kind+": ") + (isUrl ? '<a href="'+value+'" target="_blank">'+value+'</a>' : value);
+    box.appendChild(chip);
+  }
+  function showApproval(kind, detail){
+    const a = $("#approval");
+    a.innerHTML = '⚠ Approve <b>'+kind+'</b>: '+detail +
+      '<div class="btns"><button class="approve">Approve</button><button class="reject">Reject</button></div>';
+    a.classList.add("show");
+    const stage = kind === "dremio" ? "dremio" : "qlik";
+    setStage(stage, "waiting");
+    a.querySelector(".approve").onclick = ()=>{ ws && ws.send("y"); a.classList.remove("show"); };
+    a.querySelector(".reject").onclick  = ()=>{ ws && ws.send("n"); a.classList.remove("show"); };
+  }
+  function resetUI(){
+    stagesOrder.forEach(n=>{ const el=stageEl(n); el.dataset.st="pending"; el.querySelector(".t").textContent=""; });
+    $("#log").innerHTML=""; $("#artifacts").innerHTML='<span style="color:#566">none yet</span>';
+    $("#approval").classList.remove("show"); startTimes={}; activeStage=null;
+  }
+  function handle(msg){
+    if(msg.type === "error"){ if(activeStage) setStage(activeStage,"fail"); logLine(msg.message,"err"); return; }
+    if(msg.type === "done"){ setStatus("done"); return; }
+    if(msg.type === "prompt"){ logLine(msg.message); return; } // browse-mode menus echo here
+    // type === "log": could be a marker or body text
+    const p = parseMarker(msg.message);
+    if(p.kind === "stage") setStage(p.name, p.status === "start" ? "running" : (p.status === "done" ? "done" : "fail"));
+    else if(p.kind === "artifact") addArtifact(p.artifactKind, p.value);
+    else if(p.kind === "approve") showApproval(p.approveKind, p.detail);
+    else if(p.kind === "done") setStatus("complete");
+    else logLine(p.text);
+  }
+  function connect(){
+    ws = new WebSocket((location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/ws");
+    ws.onopen = ()=> setStatus("connected");
+    ws.onclose = ()=> setStatus("disconnected");
+    ws.onmessage = (e)=>{ try { handle(JSON.parse(e.data)); } catch(_) { logLine(e.data); } };
+  }
+  $("#run").onclick = ()=>{
+    const key = $("#key").value.trim(); if(!key) return;
+    resetUI(); setStatus("running "+key);
+    ws.send(JSON.stringify({action:"start", mode:"ticket", key}));
+  };
+  $("#browse").onclick = ()=>{ resetUI(); setStatus("browse"); ws.send(JSON.stringify({action:"start", mode:"browse"})); };
+  connect();
+</script>
+</body>
+</html>

@@ -175,6 +175,15 @@ def get_dashboard():
         status_code=200,
     )
 
+@app.get("/dashboard_parser.js")
+def get_parser_js():
+    """Serve the shared marker parser used by the dashboard."""
+    from fastapi.responses import Response
+    path = (_DOCS_DIR / "dashboard_parser.js") if _DOCS_DIR else None
+    if path and path.is_file():
+        return Response(path.read_text(encoding="utf-8"), media_type="application/javascript")
+    return Response("// parser missing", media_type="application/javascript", status_code=404)
+
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
