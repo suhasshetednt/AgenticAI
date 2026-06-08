@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from docx import Document
+from docx.oxml.ns import qn
 from markdown_it import MarkdownIt
 from markdown_it.token import Token
 
@@ -16,6 +17,48 @@ from adl_automated_delivery_pipeline.documentation.context import DocContext
 logger = logging.getLogger(__name__)
 
 _MD = MarkdownIt("commonmark").enable("table")
+
+# ASL branded .docx templates — design, headers, footers preserved exactly.
+_TEMPLATE_DIR = Path(
+    r"E:\LLM\Claude\adl_automated_delivery_pipeline\docs\document_template\templates"
+)
+_TEMPLATE_MAP: dict[str, Path] = {
+    "technical": _TEMPLATE_DIR / "ASL Technical Implementation - Template.docx",
+    "requirement": _TEMPLATE_DIR / "ASL Requirements Document - Template.docx",
+    "uat": _TEMPLATE_DIR / "ASL UAT - Template.docx",
+    "production": _TEMPLATE_DIR / "ASL Production Documentation - Template.docx",
+}
+
+
+def _pick_docx_template(name: str) -> Path | None:
+    """Return the matching branded template path for a markdown template name."""
+    n = name.lower()
+    if "technical" in n or "implementation" in n or "tid" in n or "api" in n or "runbook" in n:
+        return _TEMPLATE_MAP["technical"]
+    if "requirement" in n or "brd" in n:
+        return _TEMPLATE_MAP["requirement"]
+    if "uat" in n:
+        return _TEMPLATE_MAP["uat"]
+    return _TEMPLATE_MAP["production"]
+
+
+def _open_branded_doc(template_name: str) -> tuple[Document, bool]:
+    """Open the ASL branded template and clear its body content.
+
+    Returns (doc, used_template). When the template file is missing the
+    fallback is a blank Document so callers still get a valid object.
+    The bool signals whether brand.set_page_margins() still needs calling.
+    """
+    path = _pick_docx_template(template_name)
+    if path and path.exists():
+        doc = Document(str(path))
+        body = doc.element.body
+        for element in list(body):
+            if element.tag != qn("w:sectPr"):
+                body.remove(element)
+        return doc, True  # margins already defined by template
+    logger.warning("Branded template not found for %r, using blank document", template_name)
+    return Document(), False
 
 
 def _inline_text(token: Token) -> str:
@@ -54,33 +97,37 @@ def _render_tokens(doc: Any, tokens: list[Token]) -> None:
     while i < n:
         tok = tokens[i]
         ttype = tok.type
-        if ttype == "heading_open":
-            brand.add_heading(doc, _inline_text(tokens[i + 1]), level=int(tok.tag[1]))
-            i += 3
-        elif ttype == "paragraph_open":
-            brand.add_paragraph(doc, _inline_text(tokens[i + 1]))
-            i += 3
-        elif ttype == "bullet_list_open":
-            # Track nesting depth so a nested sub-list's close does not end the
-            # outer list early. Nested items are flattened to bullets.
-            depth = 1
-            i += 1
-            while depth > 0:
-                inner = tokens[i].type
-                if inner == "bullet_list_open":
-                    depth += 1
-                elif inner == "bullet_list_close":
-                    depth -= 1
-                elif inner == "inline":
-                    brand.add_bullet(doc, _inline_text(tokens[i]))
+        try:
+            if ttype == "heading_open":
+                brand.add_heading(doc, _inline_text(tokens[i + 1]), level=int(tok.tag[1]))
+                i += 3
+            elif ttype == "paragraph_open":
+                brand.add_paragraph(doc, _inline_text(tokens[i + 1]))
+                i += 3
+            elif ttype == "bullet_list_open":
+                # Track nesting depth so a nested sub-list's close does not end the
+                # outer list early. Nested items are flattened to bullets.
+                depth = 1
                 i += 1
-        elif ttype == "table_open":
-            headers, rows, i = _parse_table(tokens, i)
-            brand.add_table(doc, headers, rows)
-        elif ttype in ("fence", "code_block"):
-            brand.add_code(doc, tok.content.rstrip("\n"))
-            i += 1
-        else:
+                while depth > 0:
+                    inner = tokens[i].type
+                    if inner == "bullet_list_open":
+                        depth += 1
+                    elif inner == "bullet_list_close":
+                        depth -= 1
+                    elif inner == "inline":
+                        brand.add_bullet(doc, _inline_text(tokens[i]))
+                    i += 1
+            elif ttype == "table_open":
+                headers, rows, i = _parse_table(tokens, i)
+                brand.add_table(doc, headers, rows)
+            elif ttype in ("fence", "code_block"):
+                brand.add_code(doc, tok.content.rstrip("\n"))
+                i += 1
+            else:
+                i += 1
+        except (KeyError, ValueError) as exc:
+            logger.warning("Skipping token %r at index %d due to style error: %s", ttype, i, exc)
             i += 1
 
 
@@ -88,11 +135,12 @@ class DocxRenderer:
     extension = "docx"
 
     def render(self, markdown: str, out_path: Path, context: DocContext) -> Path:
-        # `context` is part of the Renderer protocol and reserved for future metadata use.
         out_path = out_path.with_suffix(".docx")
         out_path.parent.mkdir(parents=True, exist_ok=True)
-        doc = Document()
-        brand.set_page_margins(doc)
+        template_name = str(context.get("metadata._docx_template") or "")
+        doc, has_template = _open_branded_doc(template_name)
+        if not has_template:
+            brand.set_page_margins(doc)
         _render_tokens(doc, _MD.parse(markdown))
         doc.save(str(out_path))
         return out_path

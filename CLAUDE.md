@@ -121,3 +121,38 @@ pytest -m unit
   (not `tail_number`). See `_AMOS_CATALOG_OVERRIDES` and `_fix_dremio_sql` in the workflow.
 - The interactive dashboard (`docs/ai_dashboard_prototype.html`) is optional and lives
   outside the package; `api/app.py` degrades gracefully if `docs/` is absent.
+
+## Response Style (Claude Code)
+- Be concise. No preamble, no filler openers.
+- Skip "Sure!", "I'll now...", "Let me..." starters.
+- No closing summaries unless asked.
+- Don't explain what you're about to do — just do it.
+- Don't ask clarifying questions if context is sufficient — state assumption and proceed.
+
+## File Operations
+- Read only specific lines/functions needed — never entire files unless asked.
+- Never print file contents back unless asked.
+- Use targeted commands: `grep` over `cat`, `head`/`tail` over full reads.
+- When editing, show only changed lines + 3 lines context.
+
+## Quick Reference
+- Entry point: `adl-pipeline` or `python -m adl_automated_delivery_pipeline.workflows.adl_automated_delivery_pipeline`
+- Tests: `pytest -m unit -x -q`
+- Doc generation: `adl-doc ADL-<ticket>`
+- API: `uvicorn adl_automated_delivery_pipeline.api.main:app --reload --port 8000`
+- Current focus: Dremio Agent (NL→SQL→VDS) — follow existing doc_agent pattern
+
+## What NOT to Do
+- Don't change LLM providers — always use `get_llm()` from `adl_automated_delivery_pipeline.llm`
+- Don't read/print/edit `config.env` or `.env`
+- Don't add new dependencies without checking `requirements.txt` first
+- Don't refactor working agents unless the task requires it
+- Don't switch MCP transport to HTTP
+
+## Research Memory
+- At the start of every session, read `RESEARCH.md` silently before doing anything else.
+- Refer to it before re-deriving any known fact or re-investigating any known bug.
+- When you discover something new (a bug fix, an architectural decision, a gotcha), append it to the relevant section in `RESEARCH.md` immediately.
+- Format new entries as: `- **[topic]**: one concise line of what was found/fixed/decided`
+- Never overwrite existing entries — only append.
+- Never ask permission to update RESEARCH.md — just do it silently.

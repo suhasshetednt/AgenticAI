@@ -39,7 +39,6 @@ from adl_automated_delivery_pipeline.agents.dremio_agent import DremioAgent
 from adl_automated_delivery_pipeline.agents.doc_agent import DocumentationAgent
 from adl_automated_delivery_pipeline.agents.qlik_agent import QlikAgent
 from adl_automated_delivery_pipeline.state import make_initial_state
-from adl_automated_delivery_pipeline.workflows import _events as ev
 
 logger = logging.getLogger(__name__)
 
@@ -47,42 +46,6 @@ PROJECT     = "ADL"
 _BOARD_ID   = 2          # ADL board (simple board, id confirmed)
 _DIV        = "=" * 62
 _OUTPUT_DIR = Path(__file__).resolve().parent.parent.parent.parent / "generated_queries"
-
-
-# ── Self-healing memory ──────────────────────────────────────────────────────────
-
-_MEMORY: Any = None
-
-
-def _memory_mgr() -> Any:
-    """Lazily build the shared MemoryManager (best-effort; ``None`` if unavailable)."""
-    global _MEMORY
-    if _MEMORY is None:
-        try:
-            from adl_automated_delivery_pipeline.memory import MemoryManager
-            _MEMORY = MemoryManager()
-        except Exception as exc:  # noqa: BLE001 - memory is best-effort
-            logger.warning("Memory backend unavailable: %s", exc)
-            _MEMORY = False  # sentinel: tried and failed
-    return _MEMORY or None
-
-
-def _record_autofix(error: str, fix: str, context: str = "") -> None:
-    """Announce an auto-fix and persist the error + fix to memory.
-
-    The printed ``auto-fix`` token is what flips the matching agent into the
-    blinking "healing" state on the live dashboard, so keep it in the message.
-    """
-    print(f"  [auto-fix] {context or 'error intercepted'} — applying fix and saving to memory ...")
-    mgr = _memory_mgr()
-    if mgr is None:
-        print("  [memory] backend unavailable — fix not persisted.")
-        return
-    try:
-        mgr.store_error_fix(error=error, fix=fix, context=context)
-        print("  [memory] error + fix saved for future runs.")
-    except Exception as exc:  # noqa: BLE001 - never let memory break the workflow
-        logger.warning("Could not store error+fix: %s", exc)
 
 
 # ── Console helpers ─────────────────────────────────────────────────────────────
@@ -224,158 +187,30 @@ def _fetch_ticket(ticket_id: str) -> dict[str, Any]:
         return {"status": "FAILED", "error": str(e)}
 
 
-# ── Project selection ────────────────────────────────────────────────────────────
-
-# Friendly fallback when Jira can't be reached (offline / auth issue). The board id
-# is only a hint — at runtime we discover the real board for the chosen project.
-_KNOWN_PROJECTS: dict[str, int] = {
-    "ADL": 2,   # ADL scrum board
-    "ASL": 1,   # ASL IF scrum board (https://aslairlines.atlassian.net/jira/software/projects/ASL/boards/1)
-}
-
-
-def _discover_projects() -> list[dict[str, Any]]:
-    """Return the Jira projects the user can work on as ``[{key, name}]``.
-
-    Falls back to the known-projects map when the Jira API is unavailable.
-    """
-    try:
-        projects = _jira().projects()
-        out = [{"key": p.key, "name": getattr(p, "name", p.key)} for p in projects]
-        out.sort(key=lambda p: p["key"])
-        if out:
-            return out
-    except Exception as exc:  # noqa: BLE001 - graceful offline degradation
-        logger.warning("Could not list Jira projects: %s", exc)
-    return [{"key": k, "name": k} for k in _KNOWN_PROJECTS]
-
-
-def _resolve_board_id(project_key: str) -> int:
-    """Find the agile board id for *project_key* that actually carries sprints.
-
-    Priority:
-      1. The confirmed board id from ``_KNOWN_PROJECTS`` (e.g. ADL -> board 2).
-      2. The first *scrum* board (Kanban boards have no sprints).
-      3. The first board of any type.
-    """
-    # Confirmed board ids win — they are known to hold the active sprint.
-    known = _KNOWN_PROJECTS.get(project_key)
-    if known:
-        return known
-    try:
-        boards = _jira().boards(projectKeyOrID=project_key)
-        if boards:
-            scrum = [b for b in boards if getattr(b, "type", "").lower() == "scrum"]
-            chosen = scrum[0] if scrum else boards[0]
-            return int(chosen.id)
-    except Exception as exc:  # noqa: BLE001 - graceful offline degradation
-        logger.warning("Could not resolve board for %s: %s", project_key, exc)
-    return 0
-
-
-def _pick_project() -> bool:
-    """Let the user choose which Jira project to work on.
-
-    Updates the module-level ``PROJECT`` and ``_BOARD_ID`` globals so every
-    downstream helper (sprint/backlog/JQL) targets the chosen project. Returns
-    ``False`` if the user cancels.
-    """
-    global PROJECT, _BOARD_ID
-
-    _header("SELECT PROJECT")
-    print("  Loading projects ...")
-    projects = _discover_projects()
-
-    proj_map: dict[str, dict[str, Any]] = {}
-    for idx, p in enumerate(projects, start=1):
-        proj_map[str(idx)] = p
-        marker = "   (default)" if p["key"] == PROJECT else ""
-        print(f"  [{idx}] {p['key']:<10} {p['name']}{marker}")
-    print("  [0] Cancel")
-    print(_DIV)
-
-    while True:
-        raw = _inp(f"Select project number (Enter for {PROJECT}): ", required=False)
-        if raw == "":
-            chosen = next((p for p in projects if p["key"] == PROJECT), projects[0])
-            break
-        if raw == "0":
-            return False
-        if raw in proj_map:
-            chosen = proj_map[raw]
-            break
-        print("  Invalid selection — please try again.")
-
-    PROJECT = chosen["key"]
-    _BOARD_ID = _resolve_board_id(PROJECT)
-    print(f"\n  Project set to {PROJECT}  (board id {_BOARD_ID}).")
-    return True
-
-
 # ── Sprint selection ─────────────────────────────────────────────────────────────
 
 def _load_sprints() -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
-    """Return (active_sprints, last_10_closed_sprints) as dicts.
-
-    Scans EVERY scrum board associated with the current project so the active
-    sprint is found even when it lives on a board other than _BOARD_ID.
-    Jira creates separate boards per team/component; the URL board id is just
-    one of potentially several.
-    """
-    jira = _jira()
-
-    # Collect all board ids for this project (dedup, current board first)
-    candidate_boards: list[int] = [_BOARD_ID]
+    """Return (active_sprints, last_10_closed_sprints) as dicts."""
     try:
-        for b in jira.boards(projectKeyOrID=PROJECT):
-            bid = int(b.id)
-            if bid not in candidate_boards:
-                candidate_boards.append(bid)
+        all_sprints: list[Any] = _jira().sprints(_BOARD_ID)
+        active: list[dict[str, Any]] = []
+        closed: list[dict[str, Any]] = []
+        for s in all_sprints:
+            entry = {"id": s.id, "name": s.name, "state": s.state}
+            if s.state == "active":
+                active.append(entry)
+            elif s.state == "closed":
+                closed.append(entry)
+        # Most-recent closed sprints last in list — reverse for newest-first display
+        closed_recent = list(reversed(closed[-10:]))
+        return active, closed_recent
     except Exception as e:
-        logger.warning("Board discovery for %s: %s", PROJECT, e)
-
-    print(f" [checking {len(candidate_boards)} board(s)...]", end="", flush=True)
-
-    # ── Find the board that has an active sprint ──────────────────────────────
-    active: list[dict[str, Any]] = []
-    active_board = _BOARD_ID
-    for bid in candidate_boards:
-        try:
-            batch = list(jira.sprints(bid, state="active", startAt=0, maxResults=10))
-            if batch:
-                active = [{"id": s.id, "name": s.name, "state": "active"} for s in batch]
-                active_board = bid
-                break
-        except Exception as e:
-            logger.debug("Board %s active check: %s", bid, e)
-
-    # ── Closed sprints from the same board that owns the active sprint ────────
-    closed_all: list[dict[str, Any]] = []
-    start = 0
-    while True:
-        try:
-            batch = list(jira.sprints(active_board, state="closed", startAt=start, maxResults=50))
-        except Exception as e:
-            logger.warning("Closed sprints (board %s): %s", active_board, e)
-            break
-        if not batch:
-            break
-        for s in batch:
-            closed_all.append({"id": s.id, "name": s.name, "state": "closed"})
-        if len(batch) < 50:
-            break
-        start += 50
-
-    closed_recent = list(reversed(closed_all[-10:]))
-    return active, closed_recent
+        logger.warning("Could not load sprints: %s", e)
+        return [], []
 
 
 def _pick_sprint() -> dict[str, Any] | None:
-    """Show active + recent closed sprints; return selected sprint dict or None.
-
-    If there is exactly one active sprint the user can just press Enter to accept it
-    as the default — no number required.
-    """
+    """Show active + recent closed sprints; return selected sprint dict or None."""
     print(f"\n  Loading sprints ...", end="", flush=True)
     active, closed = _load_sprints()
     print(" done")
@@ -387,17 +222,12 @@ def _pick_sprint() -> dict[str, Any] | None:
     _header("SELECT SPRINT")
     idx = 1
     sprint_map: dict[str, dict[str, Any]] = {}
-    active_default_key: str | None = None
 
     if active:
         print("  -- Active Sprint --")
         for s in active:
-            key = str(idx)
-            marker = "  <-- (Enter to select)" if idx == 1 else ""
-            print(f"  [{idx:2d}]  {s['name']}  [ACTIVE]{marker}")
-            sprint_map[key] = s
-            if idx == 1:
-                active_default_key = key
+            print(f"  [{idx:2d}]  {s['name']}  [ACTIVE]  <-- default")
+            sprint_map[str(idx)] = s
             idx += 1
 
     if closed:
@@ -410,18 +240,8 @@ def _pick_sprint() -> dict[str, Any] | None:
     print(f"  [ 0]  Back")
     print(_DIV)
 
-    prompt = (
-        "Select sprint number (Enter for active sprint): "
-        if active_default_key
-        else "Select sprint number: "
-    )
     while True:
-        raw = _inp(prompt, required=False).strip()
-        # Empty input → auto-select the first (and normally only) active sprint
-        if raw == "" and active_default_key:
-            chosen = sprint_map[active_default_key]
-            print(f"\n  Selected: {chosen['name']}  [ACTIVE]")
-            return chosen
+        raw = _inp("Select sprint number: ")
         if raw == "0":
             return None
         if raw in sprint_map:
@@ -461,12 +281,13 @@ def _pick_ticket(issues: list[dict[str, Any]], assignee: str) -> dict[str, Any] 
 
     _header(f"TICKETS  --  {assignee}")
     # Column-aligned table — renders cleanly in the monospace web console and the CLI.
-    print(f"  {'#':>2}  {'Key':<9} {'Status':<16} {'Pri':<3} Summary")
-    print(f"  {'-' * 2}  {'-' * 9} {'-' * 16} {'-' * 3} {'-'*60}")
+    print(f"  {'#':>2}   {'Key':<9} {'Status':<17} {'Priority':<9} Summary")
+    print(f"  {'-' * 2}   {'-' * 9} {'-' * 17} {'-' * 9} {'-' * 45}")
     for idx, t in enumerate(my_issues, 1):
         summary = t["summary"] or ""
-        pri = (t["priority"] or "")[:3]
-        print(f"  {idx:>2d}  {t['id']:<9} {t['state']:<16} {pri:<3} {summary}")
+        if len(summary) > 55:
+            summary = summary[:54].rstrip() + "..."
+        print(f"  {idx:>2d}   {t['id']:<9} {t['state']:<17} {t['priority']:<9} {summary}")
     print(f"  {'0':>2}   Back")
     print(_DIV)
 
@@ -939,11 +760,8 @@ def _save_sql(reqs: TicketRequirements, sql: str) -> Path:
 
 # ── Documentation Agent phase ───────────────────────────────────────────────────
 
-def _doc_phase(reqs: TicketRequirements) -> "Path | None":
-    """Phase 2: Run DocumentationAgent to produce a Technical Implementation Document.
-
-    Returns the saved .docx Path on success, or None if generation failed.
-    """
+def _doc_phase(reqs: TicketRequirements) -> None:
+    """Phase 2: Run DocumentationAgent to produce a Technical Implementation Document."""
     _header("DOCUMENTATION AGENT  —  Technical Implementation Document")
     print("  Generating Technical Implementation Document from ticket requirements ...")
     print("  (This calls the configured LLM — may take 15–30 seconds)\n")
@@ -951,16 +769,13 @@ def _doc_phase(reqs: TicketRequirements) -> "Path | None":
         agent = DocumentationAgent()
         path = agent.generate(reqs)
         print(f"\n  Document saved: {path}")
-        print("  Open it in Word for review and sign-off.\n")
-        return path
+        print(f"  Open it in Word for review and sign-off.\n")
     except RuntimeError as exc:
         print(f"\n  WARNING: Documentation generation failed: {exc}")
         print("  Continuing to Dremio Agent ...\n")
-        return None
     except Exception as exc:
         print(f"\n  WARNING: Unexpected error during documentation: {exc}")
         print("  Continuing to Dremio Agent ...\n")
-        return None
 
 
 # ── Dremio folder path helper ────────────────────────────────────────────────────
@@ -1122,230 +937,6 @@ def _pick_vds_location(
     return "dremio-db", folder_path, vds_name
 
 
-def _pick_existing_vds() -> tuple[str, str, str, str, str] | None:
-    """Guided terminal workflow to pick an existing VDS."""
-    from adl_automated_delivery_pipeline.tools.dremio_tools import list_catalog_children
-    current_space = "dremio-db"
-    current_folder = ""
-    
-    while True:
-        path_to_list = f"{current_space}.{current_folder.replace('/', '.')}" if current_folder else current_space
-        _header(f"BROWSE VDS  —  Inside {path_to_list}")
-        
-        print("  Loading ...", end="", flush=True)
-        res = cast(Any, list_catalog_children).invoke({"path": path_to_list})
-        if res.get("status") != "SUCCESS":
-            print(f" ERROR: {res.get('error')}")
-            return None
-            
-        children = res.get("children", [])
-        items = []
-        for c in children:
-            t = str(c.get("type", "")).upper()
-            dt = str(c.get("datasetType", "")).upper()
-            if t in ("CONTAINER", "FOLDER", "SPACE", "SOURCE") or not t:
-                items.append(("DIR", c))
-            elif t == "VIRTUAL_DATASET" or dt == "VIRTUAL_DATASET" or dt == "VIRTUAL":
-                items.append(("VDS", c))
-            elif t == "PHYSICAL_DATASET" or dt == "PHYSICAL_DATASET" or dt == "PHYSICAL" or dt == "PROMOTED":
-                items.append(("PDS", c))
-            elif t == "DATASET":
-                items.append(("VDS", c))
-        
-        print(f" done.\n")
-        
-        for idx, (type_code, child) in enumerate(items, 1):
-            if type_code == "DIR":
-                print(f"  [{idx:2d}]  {child['name']}/")
-            elif type_code == "VDS":
-                print(f"  [{idx:2d}]  {child['name']}")
-            else:
-                print(f"  [{idx:2d}]  {child['name']} (Not editable)")
-                
-        print()
-        if current_folder:
-            print("  [ U]  Up one level")
-        print("  [ C]  Cancel")
-        print(_DIV)
-        
-        choice = _inp("Select option: ").strip()
-        if choice.upper() == "C":
-            return None
-        if choice.upper() == "U" and current_folder:
-            parts = current_folder.split("/")
-            current_folder = "/".join(parts[:-1])
-            continue
-            
-        if choice.isdigit() and 1 <= int(choice) <= len(items):
-            type_code, child = items[int(choice) - 1]
-            if type_code == "PDS":
-                print("\n  Cannot edit a Physical Dataset (PDS). Only VDS can be selected.\n")
-                continue
-            elif type_code == "DIR":
-                current_folder = f"{current_folder}/{child['name']}" if current_folder else child['name']
-                continue
-            elif type_code == "VDS":
-                folder_str = current_folder.replace("/", ".")
-                vds_path = f"{current_space}.{folder_str}.{child['name']}" if folder_str else f"{current_space}.{child['name']}"
-                return (current_space, current_folder, child['name'], vds_path, child.get("id"))
-        else:
-            print("\n  Invalid selection.\n")
-
-
-def _read_vds_sql(vds_path: str) -> str:
-    from adl_automated_delivery_pipeline.tools.dremio_tools import get_catalog_item
-    res = cast(Any, get_catalog_item).invoke({"path": vds_path})
-    if res.get("status") != "SUCCESS":
-        return ""
-    item = res.get("item", {})
-    if "virtualDataset" in item and "sql" in item["virtualDataset"]:
-        return item["virtualDataset"]["sql"]
-    return item.get("sql", "")
-
-
-def _llm_rewrite_sql(existing_sql: str, instructions: str, rules: str) -> str:
-    prompt = (
-        f"You are a Dremio SQL expert. Modify the following SQL according to these instructions:\n\n"
-        f"INSTRUCTIONS:\n{instructions}\n\n"
-        f"EXISTING SQL:\n{existing_sql}\n"
-    )
-    _llm = get_llm()
-    _resp = _llm.invoke([
-        SystemMessage(content=(
-            "Return ONLY the updated SQL query — no explanation, no markdown fences.\n\n"
-            f"QUERY RULES (apply all):\n{rules}"
-        )),
-        HumanMessage(content=prompt),
-    ])
-    raw_sql = str(_resp.content) if hasattr(_resp, "content") else str(_resp)
-    sql = _fix_dremio_sql(_fix_reserved_keywords(_remove_semicolons(_strip_fences(raw_sql.strip()))))
-    return sql
-
-
-def _update_vds_interactive(reqs: TicketRequirements | None) -> str:
-    vds_info = _pick_existing_vds()
-    if not vds_info:
-        return ""
-    space, folder, vds_name, vds_path, vds_id = vds_info
-    
-    print(f"\n  Fetching SQL for {vds_path}...")
-    existing_sql = _read_vds_sql(vds_path)
-    if not existing_sql:
-        print("  Failed to fetch or find SQL for this VDS.")
-        return ""
-        
-    print("\n" + _DIV)
-    print("EXISTING SQL:")
-    print(existing_sql)
-    print(_DIV + "\n")
-    
-    edit = _inp("Edit this query? [y/n]: ", required=False)
-    if edit.lower() not in ("y", "yes"):
-        return ""
-        
-    _rules_path = Path(__file__).resolve().parent.parent / "rules" / "dremio_query_rules.md"
-    _rules = _rules_path.read_text(encoding="utf-8")[:6_000] if _rules_path.exists() else ""
-    
-    current_sql = existing_sql
-    from adl_automated_delivery_pipeline.tools.dremio_tools import validate_sql_query, create_virtual_dataset, execute_dremio_sql, create_dremio_folder
-    from adl_automated_delivery_pipeline.audit import AuditLogger
-    
-    while True:
-        instructions = _inp("\nDescribe what needs to change in plain English:\n  > ")
-        print("  Generating updated SQL...")
-        new_sql = _llm_rewrite_sql(current_sql, instructions, _rules)
-        
-        print("\n" + _DIV)
-        print("NEW SQL:")
-        print(new_sql)
-        print(_DIV + "\n")
-        
-        print("  [1] Accept")
-        print("  [2] Refine more")
-        print("  [3] Cancel")
-        print(_DIV)
-        sub = _inp("Select [1/2/3]: ")
-        
-        if sub == "3":
-            print("  Cancelled edit.")
-            return ""
-        elif sub == "2":
-            current_sql = new_sql
-            continue
-        elif sub == "1":
-            if reqs:
-                sql_file = _save_sql(reqs, new_sql)
-                print(f"\n  New SQL saved locally: {sql_file}")
-            
-            print("  Validating new SQL...")
-            val = cast(Any, validate_sql_query).invoke({"sql": new_sql})
-            if val.get("status") != "SUCCESS":
-                print(f"\n  Validation FAILED: {val.get('error', val)}\n")
-                current_sql = new_sql
-                continue
-                
-            print("  SQL validated OK.")
-            
-            action = _inp("\n  Before replacing, do you want to [b]ackup, [d]elete, or [c]ancel? [b/d/c]: ")
-            if action.lower() in ("b", "backup"):
-                print("  Backing up existing VDS...")
-                from datetime import datetime
-                ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-                backup_name = f"{vds_name}_{ts}"
-                backup_folder = f"{folder}/backup" if folder else "backup"
-                create_dremio_folder(space=space, folder_path=backup_folder)
-                
-                res_bak = cast(Any, create_virtual_dataset).invoke({
-                    "space": space,
-                    "folder_path": backup_folder,
-                    "vds_name": backup_name,
-                    "sql": existing_sql
-                })
-                if res_bak.get("status") == "SUCCESS":
-                    print(f"  Old VDS copied to backup as {backup_name}.")
-                    cast(Any, execute_dremio_sql).invoke({"sql": f'DROP VIEW {_quote_dremio_path(space, folder, vds_name)}'})
-                    print("  Old VDS removed.")
-                else:
-                    print(f"  Failed to backup: {res_bak.get('error')}. Aborting update.")
-                    return ""
-            elif action.lower() in ("d", "delete"):
-                print("  Deleting existing VDS...")
-                cast(Any, execute_dremio_sql).invoke({"sql": f'DROP VIEW {_quote_dremio_path(space, folder, vds_name)}'})
-                print("  Old VDS deleted.")
-            else:
-                print("  Update cancelled.")
-                return ""
-                
-            print(f"\n  Creating VDS at {vds_path} with new SQL...")
-            cres = cast(Any, create_virtual_dataset).invoke({
-                "space": space,
-                "folder_path": folder,
-                "vds_name": vds_name,
-                "sql": new_sql,
-            })
-            if cres.get("status") == "SUCCESS":
-                print("  VDS updated successfully!")
-                print(f"  ID  : {cres.get('vds_id')}")
-                print(f"  Path: {cres.get('vds_path')}\n")
-                
-                AuditLogger.log_action(
-                    trace_id="interactive",
-                    session_id=reqs.ticket_id if reqs else "unknown",
-                    agent="dremio_agent",
-                    action="Update VDS",
-                    user_id="cli",
-                    role="operator",
-                    project_key=(reqs.ticket_id.split("-")[0] if reqs and reqs.ticket_id else "ADL"),
-                    input_summary=f"Updated {vds_path}",
-                    output_summary="Original SQL backed up/deleted, new SQL applied via LLM rewrite.",
-                )
-                return vds_path
-            else:
-                print(f"\n  VDS creation FAILED:")
-                print(f"  {cres.get('error', cres)}\n")
-                return ""
-
-
 # ── Dremio Agent phase ───────────────────────────────────────────────────────────
 
 _DREMIO_MENU = """\
@@ -1420,25 +1011,13 @@ def _dremio_phase(reqs: TicketRequirements | None) -> str:
                             raise
 
                 result = {"agent_output": raw_sql}
-                _pre_fix_sql = _strip_fences(raw_sql.strip())
                 sql = _fix_dremio_sql(
                     _fix_reserved_keywords(
                         _remove_semicolons(
-                            _pre_fix_sql
+                            _strip_fences(raw_sql.strip())
                         )
                     )
                 )
-
-                # If the deterministic Calcite-dialect repairs actually changed the
-                # SQL, that is an auto-fix worth remembering for future runs.
-                if sql and _pre_fix_sql and sql.strip() != _pre_fix_sql.strip():
-                    _record_autofix(
-                        error="Generated SQL was not valid Dremio/Calcite dialect "
-                              "(semicolons / reserved words / unsupported constructs).",
-                        fix="Applied automatic Calcite-dialect fix-ups "
-                            "(_fix_dremio_sql / _fix_reserved_keywords / _remove_semicolons).",
-                        context="Dremio SQL generation",
-                    )
 
                 if not sql:
                     print("\n  Agent returned empty SQL — retrying automatically ...\n")
@@ -1561,12 +1140,6 @@ def _dremio_phase(reqs: TicketRequirements | None) -> str:
                                         err_msg = cres.get("error")
                                         sep = "\n" if reqs.extra_notes else ""
                                         reqs.extra_notes += f"{sep}[Attempt {attempt} API Error]: {err_msg}. Please fix this SQL error."
-                                        _record_autofix(
-                                            error=f"Dremio VDS creation failed (attempt {attempt}): {err_msg}",
-                                            fix="Fed the Dremio error back into the prompt and "
-                                                "auto-regenerated the SQL.",
-                                            context="Dremio VDS creation",
-                                        )
                                         print("  Error noted. Regenerating ...\n")
                                         regenerate = True
                                         break
@@ -1641,10 +1214,15 @@ def _dremio_phase(reqs: TicketRequirements | None) -> str:
 
         # ── [7] Update VDS ─────────────────────────────────────────────────────
         elif choice == "7":
-            path = _update_vds_interactive(reqs)
-            if path:
-                approved_vds_path = path
-                return approved_vds_path
+            vds_id = _inp("VDS catalog ID: ")
+            sql    = _remove_semicolons(_read_multiline("Enter new SQL definition (blank line twice when done):"))
+            if sql:
+                state = make_initial_state(
+                    user_id="workflow", role="admin", project_key=PROJECT,
+                    message=f"Update VDS with catalog ID '{vds_id}' using this SQL:\n{sql}",
+                )
+                result = cast(dict[str, Any], agent.run(state))
+                print(f"\n{result.get('agent_output', '')}\n")
 
         # ── [8] Free-text ──────────────────────────────────────────────────────
         elif choice == "8":
@@ -1967,67 +1545,6 @@ def _post_workflow_git_check() -> None:
         print(f" (Failed to check git status: {e})")
 
 
-# ── Headless dashboard runner ────────────────────────────────────────────────────
-
-def run_ticket(key: str, start_at: str = "jira") -> None:
-    """Headless dashboard runner: execute the full pipeline for one ticket key,
-    emitting sentinel markers around each phase. v1 always starts at "jira";
-    ``start_at`` is accepted for a future resume feature but only "jira" runs.
-    """
-    ev.stage("jira", "start")
-    ticket = _fetch_ticket(key)
-    if ticket.get("status") != "SUCCESS":
-        print(f"  ERROR fetching {key}: {ticket.get('error')}")
-        ev.stage("jira", "fail")
-        ev.done()
-        return
-    ev.stage("jira", "done")
-
-    ev.stage("reqs", "start")
-    reqs = _extract_requirements(ticket)
-    if reqs is None:
-        print("  Could not extract requirements.")
-        ev.stage("reqs", "fail")
-        ev.done()
-        return
-    _display_requirements(reqs)
-    ev.stage("reqs", "done")
-
-    ev.stage("doc", "start")
-    doc_path = _doc_phase(reqs)
-    if doc_path is not None:
-        ev.artifact("docx", doc_path.as_posix())
-    ev.stage("doc", "done")
-
-    ev.approve("dremio", f"{reqs.ticket_id}: {reqs.summary}")
-    if _inp("Approve Dremio Agent (create/modify VDS)? [y/n]: ", required=False).lower() not in (
-        "y", "yes", "1",
-    ):
-        print("  Stopped before Dremio.")
-        ev.done()
-        return
-
-    ev.stage("dremio", "start")
-    vds_path = _dremio_phase(reqs)
-    if vds_path:
-        ev.artifact("vds", vds_path)
-        ev.stage("dremio", "done")
-    else:
-        ev.stage("dremio", "fail")
-        ev.done()
-        return
-
-    ev.approve("qlik", vds_path)
-    if _inp("Build QlikSense dashboard from this VDS? [y/n]: ", required=False).lower() in (
-        "y", "yes", "1",
-    ):
-        ev.stage("qlik", "start")
-        _qlik_phase(reqs, vds_path)
-        ev.stage("qlik", "done")
-
-    ev.done()
-
-
 # ── Main ────────────────────────────────────────────────────────────────────────
 
 def main() -> None:
@@ -2045,217 +1562,217 @@ def main() -> None:
         if candidate.exists():
             load_dotenv(candidate, override=False)
 
-    # ── Choose the Jira project to work on (default: ADL) ─────────────────────
-    if not _pick_project():
+    print(f"\n{_DIV}")
+    print("  ASL AIRLINES  --  ADL WORKFLOW  |  JIRA -> DOC -> DREMIO -> QLIK")
+    print(_DIV)
+    print("  [1]  Work on an existing ticket  (browse sprint)")
+    print("  [2]  Browse backlog tickets")
+    print("  [3]  Create a new ticket")
+    print("  [4]  GitHub version control assistant")
+    print("  [0]  Exit")
+    print(_DIV)
+
+    mode = _inp("Select option: ")
+
+    if mode == "0":
         print("  Bye.")
         return
 
-    # ── Main menu loop — [0] in any sub-menu returns here; [0] here exits ───────
-    while True:
-        print(f"\n{_DIV}")
-        print(f"  ASL AIRLINES  --  {PROJECT} WORKFLOW  |  JIRA -> DOC -> DREMIO -> QLIK")
-        print(_DIV)
-        print("  [1]  Work on an existing ticket  (browse sprint)")
-        print("  [2]  Browse backlog tickets")
-        print("  [3]  Create a new ticket")
-        print("  [4]  GitHub version control assistant")
-        print("  [0]  Exit")
-        print(_DIV)
+    ticket: dict[str, Any] | None = None
+    reqs:   TicketRequirements | None = None
 
-        mode = _inp("Select option: ")
-
-        if mode == "0":
-            print("  Bye.")
+    # ── Mode 1: Sprint ticket ─────────────────────────────────────────────────
+    if mode == "1":
+        sprint = _pick_sprint()
+        if not sprint:
+            print("  Cancelled.")
             return
 
-        ticket: dict[str, Any] | None = None
-        reqs:   TicketRequirements | None = None
+        print(f"\n  Fetching tickets for {sprint['name']} ...", end="", flush=True)
+        issues = _fetch_sprint_issues(sprint["id"])
+        if not issues:
+            print(f"\n  No tickets found in {sprint['name']}. Exiting.")
+            return
+        print(f" done  ({len(issues)} tickets found)")
 
-        # ── Mode 1: Sprint ticket ─────────────────────────────────────────────
-        if mode == "1":
-            sprint = _pick_sprint()
-            if not sprint:
-                continue
+        assignee = _pick_assignee(issues, sprint["name"])
+        if not assignee:
+            print("  Cancelled.")
+            return
 
-            print(f"\n  Fetching tickets for {sprint['name']} ...", end="", flush=True)
-            issues = _fetch_sprint_issues(sprint["id"])
-            if not issues:
-                print(f"\n  No tickets found in {sprint['name']}.")
-                continue
-            print(f" done  ({len(issues)} tickets found)")
+        selected = _pick_ticket(issues, assignee)
+        if not selected:
+            print("  Cancelled.")
+            return
 
-            assignee = _pick_assignee(issues, sprint["name"])
-            if not assignee:
-                continue
+        _header(f"SELECTED TICKET : {selected['id']}")
+        print(f"  Sprint   : {sprint['name']}  [{sprint['state'].upper()}]")
+        print(f"  Summary  : {selected['summary']}")
+        print(f"  State    : {selected['state']}")
+        print(f"  Priority : {selected['priority']}")
+        print(f"  Assignee : {assignee}")
+        print(_DIV)
 
-            selected = _pick_ticket(issues, assignee)
-            if not selected:
-                continue
+        print(f"\n  Fetching full ticket details ...", end="", flush=True)
+        ticket = _fetch_ticket(selected["id"])
+        if ticket["status"] == "FAILED":
+            print(f"\n  ERROR: {ticket.get('error')}")
+            return
+        print(" done")
+        _transition_to_in_progress(selected["id"], selected["state"])
+        print()
 
-            _header(f"SELECTED TICKET : {selected['id']}")
-            print(f"  Sprint   : {sprint['name']}  [{sprint['state'].upper()}]")
-            print(f"  Summary  : {selected['summary']}")
-            print(f"  State    : {selected['state']}")
-            print(f"  Priority : {selected['priority']}")
-            print(f"  Assignee : {assignee}")
+        reqs = _extract_requirements(ticket)
+        if reqs is None:
+            print("  Could not extract requirements. Exiting.")
+            return
+        _display_requirements(reqs)
+
+        confirm = _inp("Proceed to Documentation + Dremio Agent? [y/n]: ")
+        if confirm.lower() not in ("y", "yes"):
+            print("  Workflow stopped.")
+            return
+
+    # ── Mode 2: Backlog ticket ────────────────────────────────────────────────
+    elif mode == "2":
+        print(f"\n  Fetching backlog tickets ...", end="", flush=True)
+        issues = _fetch_backlog_issues()
+        if not issues:
+            print("\n  No backlog tickets found. Exiting.")
+            return
+        print(f" done  ({len(issues)} tickets found)")
+
+        assignee = _pick_assignee(issues, "Backlog")
+        if not assignee:
+            print("  Cancelled.")
+            return
+
+        selected = _pick_ticket(issues, assignee)
+        if not selected:
+            print("  Cancelled.")
+            return
+
+        _header(f"SELECTED TICKET : {selected['id']}")
+        print(f"  Source   : Backlog")
+        print(f"  Summary  : {selected['summary']}")
+        print(f"  State    : {selected['state']}")
+        print(f"  Priority : {selected['priority']}")
+        print(f"  Assignee : {assignee}")
+        print(_DIV)
+
+        print(f"\n  Fetching full ticket details ...", end="", flush=True)
+        ticket = _fetch_ticket(selected["id"])
+        if ticket["status"] == "FAILED":
+            print(f"\n  ERROR: {ticket.get('error')}")
+            return
+        print(" done")
+        _transition_to_in_progress(selected["id"], selected["state"])
+        print()
+
+        reqs = _extract_requirements(ticket)
+        if reqs is None:
+            print("  Could not extract requirements. Exiting.")
+            return
+        _display_requirements(reqs)
+
+        confirm = _inp("Proceed to Documentation + Dremio Agent? [y/n]: ")
+        if confirm.lower() not in ("y", "yes"):
+            print("  Workflow stopped.")
+            return
+
+    # ── Mode 3: Create new ticket ─────────────────────────────────────────────
+    elif mode == "3":
+        ticket = _create_ticket_flow()
+        if ticket:
+            reqs = _extract_requirements(ticket)
+            if reqs:
+                _display_requirements(reqs)
+                confirm = _inp("Proceed to Documentation + Dremio Agent? [y/n]: ")
+                if confirm.lower() not in ("y", "yes"):
+                    print("  Workflow stopped.")
+                    return
+
+    # ── Mode 4: GitHub ────────────────────────────────────────────────────────
+    elif mode == "4":
+        _github_flow()
+        return
+
+    else:
+        print("  Invalid option. Exiting.")
+        return
+
+    # ── Phase 2: Documentation Agent ──────────────────────────────────────────
+    if reqs:
+        _doc_phase(reqs)
+        doc_confirm = _inp("Proceed to Dremio Agent? [y/n]: ")
+        if doc_confirm.lower() not in ("y", "yes"):
+            print("  Workflow stopped after documentation.")
+            _header("WORKFLOW COMPLETE")
+            print(f"  Ticket  : {reqs.ticket_id}")
             print(_DIV)
+            return
+        # Cooldown reduced as per user request
+        print("  Cooling down 5s to reset API rate limit window ...", end="", flush=True)
+        time.sleep(5)
+        print(" ready.\n")
 
-            print(f"\n  Fetching full ticket details ...", end="", flush=True)
-            ticket = _fetch_ticket(selected["id"])
-            if ticket["status"] == "FAILED":
-                print(f"\n  ERROR: {ticket.get('error')}")
-                continue
-            print(" done")
-            _transition_to_in_progress(selected["id"], selected["state"])
-            print()
+    # ── Phase 3: Dremio Agent ─────────────────────────────────────────────────
+    vds_path = _dremio_phase(reqs)
 
-            reqs = _extract_requirements(ticket)
-            if reqs is None:
-                print("  Could not extract requirements.")
-                continue
-            _display_requirements(reqs)
-
-            confirm = _inp("Proceed to Documentation + Dremio Agent? [y/n]: ")
-            if confirm.lower() not in ("y", "yes"):
-                continue
-
-        # ── Mode 2: Backlog ticket ────────────────────────────────────────────
-        elif mode == "2":
-            print(f"\n  Fetching backlog tickets ...", end="", flush=True)
-            issues = _fetch_backlog_issues()
-            if not issues:
-                print("\n  No backlog tickets found.")
-                continue
-            print(f" done  ({len(issues)} tickets found)")
-
-            assignee = _pick_assignee(issues, "Backlog")
-            if not assignee:
-                continue
-
-            selected = _pick_ticket(issues, assignee)
-            if not selected:
-                continue
-
-            _header(f"SELECTED TICKET : {selected['id']}")
-            print(f"  Source   : Backlog")
-            print(f"  Summary  : {selected['summary']}")
-            print(f"  State    : {selected['state']}")
-            print(f"  Priority : {selected['priority']}")
-            print(f"  Assignee : {assignee}")
-            print(_DIV)
-
-            print(f"\n  Fetching full ticket details ...", end="", flush=True)
-            ticket = _fetch_ticket(selected["id"])
-            if ticket["status"] == "FAILED":
-                print(f"\n  ERROR: {ticket.get('error')}")
-                continue
-            print(" done")
-            _transition_to_in_progress(selected["id"], selected["state"])
-            print()
-
-            reqs = _extract_requirements(ticket)
-            if reqs is None:
-                print("  Could not extract requirements.")
-                continue
-            _display_requirements(reqs)
-
-            confirm = _inp("Proceed to Documentation + Dremio Agent? [y/n]: ")
-            if confirm.lower() not in ("y", "yes"):
-                continue
-
-        # ── Mode 3: Create new ticket ─────────────────────────────────────────
-        elif mode == "3":
-            ticket = _create_ticket_flow()
-            if not ticket:
-                continue
-            reqs = _extract_requirements(ticket)
-            if not reqs:
-                continue
-            _display_requirements(reqs)
-            confirm = _inp("Proceed to Documentation + Dremio Agent? [y/n]: ")
-            if confirm.lower() not in ("y", "yes"):
-                continue
-
-        # ── Mode 4: GitHub ────────────────────────────────────────────────────
-        elif mode == "4":
-            _github_flow()
-            continue  # back to main menu after github flow
-
-        else:
-            print("  Invalid option.")
-            continue
-
-        # ── Phase 2: Documentation Agent ──────────────────────────────────────
-        if reqs:
-            _doc_phase(reqs)
-            doc_confirm = _inp("Proceed to Dremio Agent? [y/n]: ")
-            if doc_confirm.lower() not in ("y", "yes"):
-                _header("WORKFLOW COMPLETE")
-                print(f"  Ticket  : {reqs.ticket_id}")
-                print(_DIV)
-                continue
-            print("  Cooling down 5s to reset API rate limit window ...", end="", flush=True)
-            time.sleep(5)
-            print(" ready.\n")
-
-        # ── Phase 3: Dremio Agent ─────────────────────────────────────────────
-        vds_path = _dremio_phase(reqs)
-
-        # ── Phase 4: QlikSense Dashboard ──────────────────────────────────────
-        if vds_path:
-            ans = _inp("Build QlikSense dashboard from this VDS? [y/n]: ", required=False)
-            if ans.lower() in ("y", "yes", "1"):
-                qlik_reqs = reqs
-                sep_ans = _inp("Is there a separate JIRA ticket for Qlik? [y/n]: ", required=False)
-                if sep_ans.lower() in ("y", "yes", "1"):
-                    print("\n  [1] Work on an existing Qlik ticket (browse sprint)")
-                    print("  [2] Browse Qlik backlog tickets")
-                    print("  [0] Cancel / use original ticket")
-                    q_mode = _inp("Select option: ")
-
-                    selected = None
-                    if q_mode == "1":
-                        sprint = _pick_sprint()
-                        if sprint:
-                            issues = _fetch_sprint_issues(sprint["id"])
-                            if issues:
-                                assignee = _pick_assignee(issues, sprint["name"])
-                                if assignee:
-                                    selected = _pick_ticket(issues, assignee)
-                    elif q_mode == "2":
-                        issues = _fetch_backlog_issues()
+    # ── Phase 4: QlikSense Dashboard ──────────────────────────────────────────
+    if vds_path:
+        ans = _inp("Build QlikSense dashboard from this VDS? [y/n]: ", required=False)
+        if ans.lower() in ("y", "yes", "1"):
+            qlik_reqs = reqs
+            sep_ans = _inp("Is there a separate JIRA ticket for Qlik? [y/n]: ", required=False)
+            if sep_ans.lower() in ("y", "yes", "1"):
+                print("\n  [1] Work on an existing Qlik ticket (browse sprint)")
+                print("  [2] Browse Qlik backlog tickets")
+                print("  [0] Cancel / use original ticket")
+                q_mode = _inp("Select option: ")
+                
+                selected = None
+                if q_mode == "1":
+                    sprint = _pick_sprint()
+                    if sprint:
+                        issues = _fetch_sprint_issues(sprint["id"])
                         if issues:
-                            assignee = _pick_assignee(issues, "Backlog")
+                            assignee = _pick_assignee(issues, sprint["name"])
                             if assignee:
                                 selected = _pick_ticket(issues, assignee)
+                elif q_mode == "2":
+                    issues = _fetch_backlog_issues()
+                    if issues:
+                        assignee = _pick_assignee(issues, "Backlog")
+                        if assignee:
+                            selected = _pick_ticket(issues, assignee)
+                            
+                if selected:
+                    print(f"\n  Fetching full Qlik ticket details ...", end="", flush=True)
+                    q_ticket = _fetch_ticket(selected["id"])
+                    if q_ticket["status"] != "FAILED":
+                        print(" done")
+                        _transition_to_in_progress(selected["id"], selected["state"])
+                        print()
+                        q_reqs = _extract_requirements(q_ticket)
+                        if q_reqs:
+                            _display_requirements(q_reqs)
+                            qlik_reqs = q_reqs
+                    else:
+                        print(f"\n  ERROR: {q_ticket.get('error')}")
 
-                    if selected:
-                        print(f"\n  Fetching full Qlik ticket details ...", end="", flush=True)
-                        q_ticket = _fetch_ticket(selected["id"])
-                        if q_ticket["status"] != "FAILED":
-                            print(" done")
-                            _transition_to_in_progress(selected["id"], selected["state"])
-                            print()
-                            q_reqs = _extract_requirements(q_ticket)
-                            if q_reqs:
-                                _display_requirements(q_reqs)
-                                qlik_reqs = q_reqs
-                        else:
-                            print(f"\n  ERROR: {q_ticket.get('error')}")
+            if qlik_reqs:
+                _qlik_phase(qlik_reqs, vds_path)
+            else:
+                print("\n  Cannot build Qlik dashboard: No ticket requirements available.")
 
-                if qlik_reqs:
-                    _qlik_phase(qlik_reqs, vds_path)
-                else:
-                    print("\n  Cannot build Qlik dashboard: No ticket requirements available.")
+    _post_workflow_git_check()
 
-        _post_workflow_git_check()
-
-        _header("WORKFLOW COMPLETE")
-        print(f"  Ticket  : {reqs.ticket_id if reqs else 'N/A'}")
-        if reqs and reqs.extra_notes:
-            print(f"  Notes   : {reqs.extra_notes[:120]}")
-        print(_DIV)
-        # Loop back to main menu — user can run another ticket or [0] to exit
+    _header("WORKFLOW COMPLETE")
+    print(f"  Ticket  : {reqs.ticket_id if reqs else 'N/A'}")
+    if reqs and reqs.extra_notes:
+        print(f"  Notes   : {reqs.extra_notes[:120]}")
+    print(_DIV)
 
 
 if __name__ == "__main__":

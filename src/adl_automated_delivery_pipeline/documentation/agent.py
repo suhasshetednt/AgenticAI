@@ -20,11 +20,24 @@ import adl_automated_delivery_pipeline.documentation.renderers  # noqa: F401,E40
 logger = logging.getLogger(__name__)
 
 _DEFAULT_OUT = Path.cwd() / "Project Documentation"
-_SLUG = re.compile(r"[^A-Za-z0-9._-]+")
+_INVALID_WIN = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
 
 
-def _slug(text: str) -> str:
-    return _SLUG.sub("_", text).strip("_") or "document"
+def _doc_prefix(template_name: str) -> str:
+    """Map a template name to the ASL document prefix."""
+    n = template_name.lower()
+    if "technical" in n or "implementation" in n or "tid" in n or "api" in n or "runbook" in n:
+        return "ASL Technical Implementation"
+    if "requirement" in n or "brd" in n:
+        return "ASL Requirements Document"
+    if "uat" in n:
+        return "ASL UAT"
+    return "ASL Production Documentation"
+
+
+def _safe_filename(text: str) -> str:
+    """Strip Windows-invalid filename characters while preserving spaces."""
+    return _INVALID_WIN.sub("", str(text)).strip()
 
 
 class DocumentationAgent:
@@ -45,8 +58,12 @@ class DocumentationAgent:
         tpl = Template.load(template)
         filled = get_filler(filler).fill(tpl, context)
 
-        ts = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
-        stem = f"{_slug(context.title)}_{ts}"
+        # Tell the docx renderer which branded template to load.
+        context.metadata["_docx_template"] = str(template)
+
+        prefix = _doc_prefix(str(template))
+        name = _safe_filename(context.subtitle or context.title)
+        stem = f"{prefix} - {name}" if name else prefix
 
         paths: list[Path] = []
         for fmt in fmts:

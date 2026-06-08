@@ -9,12 +9,12 @@ from adl_automated_delivery_pipeline.documentation import brand
 
 
 @pytest.mark.unit
-def test_add_heading_sets_navy_for_level1() -> None:
+def test_add_heading_adds_text() -> None:
     doc = Document()
     brand.add_heading(doc, "Section", level=1)
     para = doc.paragraphs[-1]
     assert para.runs[0].text == "Section"
-    assert para.runs[0].font.color.rgb == brand.COLOR_NAVY
+    # Colour is inherited from OCC template styles — not overridden inline.
 
 
 @pytest.mark.unit
@@ -85,7 +85,7 @@ def test_docx_renderer_maps_markdown_to_docx_model(tmp_path: Path) -> None:
     texts = [p.text for p in doc.paragraphs]
     assert "Title" in texts
     assert "Intro paragraph." in texts
-    assert any("First step" == t for t in texts)
+    assert any("First step" in t for t in texts)  # may be prefixed with bullet char
     # one table with header + 2 rows
     assert len(doc.tables) == 1
     assert doc.tables[0].rows[0].cells[0].text == "Risk"
@@ -98,7 +98,8 @@ def test_docx_renderer_nested_bullets_all_stay_bullets(tmp_path: Path) -> None:
     r = renderers_base.get_renderer("docx")
     out = r.render("- Before\n  - Nested\n- After\n", tmp_path / "n.docx", DocContext(title="t"))
     doc = _Doc(str(out))
-    bullets = [p.text for p in doc.paragraphs if p.style.name == "List Bullet"]
+    _BULLET_STYLES = {"List Bullet", "List Paragraph"}
+    bullets = [p.text.lstrip("\xa0• ") for p in doc.paragraphs if p.style.name in _BULLET_STYLES]
     assert "Before" in bullets
     assert "Nested" in bullets
     assert "After" in bullets  # before the fix this rendered as a Normal paragraph

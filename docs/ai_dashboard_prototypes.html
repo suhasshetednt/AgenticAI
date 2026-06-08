@@ -86,10 +86,9 @@
             background: rgba(0,180,255,0.025);
             border-radius: 0 3px 3px 0;
             font-family: 'JetBrains Mono', monospace;
-            font-size: 10px; line-height: 1.65;
+            font-size: 11px; line-height: 1.65;
             color: #6ea8c8; letter-spacing: 0.3px;
-            white-space: pre;
-            text-align: left;
+            white-space: pre-wrap; word-break: break-all;
             transition: border-color 0.2s, background 0.2s;
         }
         .t-line:hover { border-color: rgba(0,180,255,0.45); background: rgba(0,180,255,0.04); }
@@ -113,26 +112,9 @@
         .t-empty { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; opacity:.25; }
         .t-empty-lbl { font-family:'Orbitron',monospace; font-size:8px; letter-spacing:3px; color:#00b4ff; }
 
-        /* ── TITLE 3-D GLOW — ASL navy depth extrusion + sky-blue luminance pulse ── */
-        @keyframes title-glow {
-            0%,100% {
-                filter:
-                    drop-shadow(0 1px 0 #0d2348)
-                    drop-shadow(0 3px 0 rgba(10,28,60,.8))
-                    drop-shadow(0 5px 3px rgba(5,12,35,.55))
-                    drop-shadow(0 0  8px rgba(89,163,217,.28))
-                    drop-shadow(0 0 22px rgba(27,58,107,.18));
-            }
-            50% {
-                filter:
-                    drop-shadow(0 1px 0 #0d2348)
-                    drop-shadow(0 3px 0 rgba(10,28,60,.8))
-                    drop-shadow(0 5px 3px rgba(5,12,35,.55))
-                    drop-shadow(0 0 18px rgba(137,196,225,.85))
-                    drop-shadow(0 0 40px rgba(27,58,107,.50));
-            }
-        }
-
+        /* ── NEO GLOW behind robot ── */
+        @keyframes neo-pulse { 0%,100%{opacity:.5;transform:translate(-50%,-50%) scale(1)} 50%{opacity:1;transform:translate(-50%,-50%) scale(1.06)} }
+        @keyframes neo-ring  { 0%{transform:scale(1);opacity:.6} 100%{transform:scale(2.2);opacity:0} }
     </style>
 </head>
 <body>
@@ -154,33 +136,26 @@ import{createRoot}from'react-dom/client';
 import{motion}from'framer-motion';
 import{Activity,RefreshCw}from'lucide-react';
 
-// ─── NODE LAYOUT — pentagon mesh (5 nodes, fully connected) ──────────────────
-// Centre (480, 490), radius 300. Flow order: jira(top)→doc(TL)→dremio(BL)→qlik(BR)→git(TR)
-// Node box is NW×NH = 128×180 px, so top-left = centre − (64, 90).
+// ─── NODE LAYOUT ─────────────────────────────────────────────────────────────
+// Single centered column for jira→doc→dremio, qlik to the right of dremio, git below qlik
 const NODES_INIT = [
-    {id:'jira',  label:'Jira Agent',    icon:'https://cdn.worldvectorlogo.com/logos/jira-3.svg',                             x:416, y:110, theme:'from-blue-400 to-blue-600',       color:'#3B82F6', status:'pending', time:'-'},
-    {id:'doc',   label:'Documentation', icon:'https://cdn-icons-png.flaticon.com/512/3979/3979305.png',                       x:131, y:317, theme:'from-orange-400 to-orange-600',   color:'#F97316', status:'pending', time:'-'},
-    {id:'dremio',label:'Dremio Agent',  icon:'https://www.vectorlogo.zone/logos/dremio/dremio-icon.svg',                      x:240, y:653, theme:'from-teal-400 to-teal-600',       color:'#5BC8C8', status:'pending', time:'-'},
-    {id:'qlik',  label:'Qlik Agent',    icon:'https://images.icon-icons.com/2107/PNG/512/file_type_qlikview_icon_130217.png', x:592, y:653, theme:'from-green-400 to-green-600',     color:'#22C55E', status:'pending', time:'-'},
-    {id:'git',   label:'GitHub Agent',  icon:'https://cdn.worldvectorlogo.com/logos/github-icon-1.svg',                       x:701, y:317, theme:'from-purple-400 to-purple-600',   color:'#A855F7', status:'pending', time:'-'},
+    {id:'jira',  label:'Jira Agent',    icon:'https://cdn.worldvectorlogo.com/logos/jira-3.svg',                             x:310, y:50,  theme:'from-blue-400 to-blue-600',   color:'#3B82F6', status:'pending', time:'-'},
+    {id:'doc',   label:'Documentation', icon:'https://cdn-icons-png.flaticon.com/512/3979/3979305.png',                       x:310, y:300, theme:'from-emerald-400 to-emerald-600', color:'#10B981', status:'pending', time:'-'},
+    {id:'dremio',label:'Dremio Agent',  icon:'https://www.vectorlogo.zone/logos/dremio/dremio-icon.svg',                      x:310, y:550, theme:'from-orange-400 to-orange-600',  color:'#F97316', status:'pending', time:'-'},
+    {id:'qlik',  label:'Qlik Agent',    icon:'https://images.icon-icons.com/2107/PNG/512/file_type_qlikview_icon_130217.png', x:680, y:550, theme:'from-green-400 to-green-600',    color:'#22C55E', status:'pending', time:'-'},
+    {id:'git',   label:'GitHub Agent',  icon:'https://cdn.worldvectorlogo.com/logos/github-icon-1.svg',                       x:680, y:800, theme:'from-purple-400 to-purple-600',  color:'#A855F7', status:'pending', time:'-'},
 ];
 
-// ─── EDGES — fully-connected mesh (10 edges = 5×4/2) ─────────────────────────
-// type:'flow'  = primary pipeline perimeter (jira→doc→dremio→qlik→git), slightly brighter
-// type:'mesh'  = cross-links (every remaining pair), dimmer dashed; any agent can use these
+// ─── EDGES — one line per pair, direction controlled by state ─────────────────
+// Each edge has a fixed SVG path. We animate a plane FROM src TO tgt when active.
+// The "active" object holds: { edgeId, fromId, toId, color }
+// Only ONE edge can carry a plane at a time per pair. Direction flips as needed.
 const EDGE_DEFS = [
-    // Primary delivery flow — pentagon perimeter, clockwise
-    {id:'j-d',  a:'jira',  b:'doc',    type:'flow'},
-    {id:'d-dr', a:'doc',   b:'dremio', type:'flow'},
-    {id:'dr-q', a:'dremio',b:'qlik',   type:'flow'},
-    {id:'q-g',  a:'qlik',  b:'git',    type:'flow'},
-    // Mesh cross-links — every remaining pair (drawn behind the flow edges)
-    {id:'j-dr', a:'jira',  b:'dremio', type:'mesh'},
-    {id:'j-q',  a:'jira',  b:'qlik',   type:'mesh'},
-    {id:'j-g',  a:'jira',  b:'git',    type:'mesh'},
-    {id:'d-q',  a:'doc',   b:'qlik',   type:'mesh'},
-    {id:'d-g',  a:'doc',   b:'git',    type:'mesh'},
-    {id:'dr-g', a:'dremio',b:'git',    type:'mesh'},
+    {id:'j-d',  a:'jira',  b:'doc',    type:'vert'},
+    {id:'d-dr', a:'doc',   b:'dremio', type:'vert'},
+    {id:'dr-q', a:'dremio',b:'qlik',   type:'horiz'},
+    {id:'q-g',  a:'qlik',  b:'git',    type:'vert'},
+    {id:'q-j',  a:'qlik',  b:'jira',   type:'curve'},  // shared line for qlik↔jira
 ];
 
 // ─── TURBINE ─────────────────────────────────────────────────────────────────
@@ -235,35 +210,33 @@ const TurbineSVG = ({spinning, idle}) => {
 // NODE_W=128 node box width, NODE_H=180 node box height
 const NW=128, NH=180;
 
-// Pentagon centre — used to bow mesh cross-links OUTWARD so they arc around the
-// perimeter and never cross through the hub in an ugly way.
-const MESH_CX = 480, MESH_CY = 490;
-
 const getEdgePath = (edge, nodesMap) => {
     const A = nodesMap[edge.a];
     const B = nodesMap[edge.b];
     if(!A||!B) return '';
-    // All edges: centre-to-centre quadratic bezier
-    const ax=A.x+NW/2, ay=A.y+NH/2;
-    const bx=B.x+NW/2, by=B.y+NH/2;
-    const mx=(ax+bx)/2,  my=(ay+by)/2;
-    const len=Math.hypot(bx-ax, by-ay)||1;
-    let cx, cy;
-    if(edge.type==='flow'){
-        // Flow: gentle bow perpendicular-left of travel direction
-        const dx=bx-ax, dy=by-ay;
-        const nx=-dy/len, ny=dx/len;
-        const bow=Math.min(45, len*0.09);
-        cx=mx+nx*bow; cy=my+ny*bow;
-    } else {
-        // Mesh cross-links: bow OUTWARD from the pentagon centre so arcs
-        // stay on the outside of the hub and never tangle with flow lines.
-        const dcx=mx-MESH_CX, dcy=my-MESH_CY;
-        const dlen=Math.hypot(dcx,dcy)||1;
-        const bow=Math.min(110, len*0.26);
-        cx=mx+dcx/dlen*bow; cy=my+dcy/dlen*bow;
+
+    if(edge.type==='vert'){
+        // bottom-center of A → top-center of B
+        const sx=A.x+NW/2, sy=A.y+NH;
+        const ex=B.x+NW/2, ey=B.y;
+        const midY=sy+(ey-sy)/2;
+        return `M${sx} ${sy} L${sx} ${midY} L${ex} ${midY} L${ex} ${ey}`;
     }
-    return `M${ax} ${ay} Q${cx} ${cy} ${bx} ${by}`;
+    if(edge.type==='horiz'){
+        // right-center of A → left-center of B (same row)
+        const sx=A.x+NW, sy=A.y+NH/2;
+        const ex=B.x,    ey=B.y+NH/2;
+        return `M${sx} ${sy} L${ex} ${ey}`;
+    }
+    if(edge.type==='curve'){
+        // Single curved line between qlik and jira (right side sweep)
+        const ax=A.x+NW, ay=A.y+NH/2;  // qlik right-mid
+        const bx=B.x+NW, by=B.y+NH/2;  // jira right-mid
+        const cx1=ax+170, cy1=ay;
+        const cx2=bx+190, cy2=by;
+        return `M${ax} ${ay} C${cx1} ${cy1},${cx2} ${cy2},${bx} ${by}`;
+    }
+    return '';
 };
 
 // Mini airplane — points in +X direction, animateMotion rotates it to path
@@ -284,106 +257,100 @@ const Plane = ({color}) => (
 );
 
 // Edge component — always renders the static line; if active renders plane
-const Edge = ({edge, nodesMap, activePlanes}) => {
+const Edge = ({edge, nodesMap, activePlane}) => {
     const path = getEdgePath(edge, nodesMap);
     if(!path) return null;
 
-    const plane = (activePlanes || []).find(p => p.edgeId === edge.id);
-    const isActive = !!plane;
-    const planeReversed = isActive && plane.fromId === edge.b;
+    // activePlane: {edgeId, fromId, toId, color}  — fromId/toId determine direction
+    const isActive = activePlane && activePlane.edgeId === edge.id;
+    // If from=b→a we reverse the path for the plane (fly backwards along same line)
+    const planeReversed = isActive && activePlane.fromId === edge.b;
+    // Build reversed path string by swapping M endpoint and reversing bezier
     const planePath = planeReversed ? reversePath(path, edge, nodesMap) : path;
-    const planeColor = isActive ? plane.color : '#3B82F6';
-    const isFlow = edge.type === 'flow';
+    const planeColor = isActive ? activePlane.color : '#3B82F6';
 
     return (
         <g>
-            {/* Uniform ambient glow — same for all edges */}
-            {!isActive && (
-                <path d={path} stroke="rgba(0,180,255,0.06)" strokeWidth={6} fill="none"/>
-            )}
-            {/* Base line — uniform dash style for all edges */}
-            <path d={path}
-                stroke={isActive ? planeColor : "rgba(0,180,255,0.28)"}
-                strokeWidth={isActive ? 2 : 1.5} fill="none"
-                strokeDasharray={isActive ? "none" : "6 6"}
-                opacity={1}/>
-            {/* Active glow */}
-            {isActive && <path d={path} stroke={planeColor} strokeWidth="5" fill="none" opacity=".35"
-                style={{filter:`drop-shadow(0 0 12px ${planeColor})`}}/>}
-            {/* Flowing light orb — replaces airplane */}
+            {/* Static base line — always shown */}
+            <path d={path} stroke="rgba(255,255,255,0.13)" strokeWidth="1.8" fill="none" strokeDasharray={isActive?"none":"6 5"}/>
+            {/* Glow when active */}
+            {isActive && <path d={path} stroke={planeColor} strokeWidth="2" fill="none" opacity=".45"
+                style={{filter:`drop-shadow(0 0 5px ${planeColor})`}}/>}
+            {/* Flying plane */}
             {isActive && (
-                <g style={{filter:`drop-shadow(0 0 8px ${planeColor}) drop-shadow(0 0 20px ${planeColor}88)`}}>
-                    <animateMotion dur="1.8s" repeatCount="indefinite" path={planePath}/>
-                    <circle r="5" fill={planeColor} opacity="1"/>
-                    <circle r="11" fill={planeColor} opacity="0.2"/>
+                <g style={{filter:`drop-shadow(0 0 4px ${planeColor})`}}>
+                    <animateMotion dur="2s" repeatCount="indefinite" path={planePath} rotate="auto"/>
+                    <Plane color={planeColor}/>
                 </g>
             )}
         </g>
     );
 };
 
-// Reverse a path: swap endpoints, keep the same arc (mirror control point bow)
+// Reverse a path so the plane flies the other direction along same line
 const reversePath = (path, edge, nodesMap) => {
     const A = nodesMap[edge.a];
     const B = nodesMap[edge.b];
     if(!A||!B) return path;
-    // Swap A↔B so the plane departs from B toward A
-    const ax=B.x+NW/2, ay=B.y+NH/2;
-    const bx=A.x+NW/2, by=A.y+NH/2;
-    const mx=(ax+bx)/2,  my=(ay+by)/2;
-    const len=Math.hypot(bx-ax, by-ay)||1;
-    let cx, cy;
-    if(edge.type==='flow'){
-        // Mirror: negate perpendicular bow so the arc traces the same curve
-        const dx=bx-ax, dy=by-ay;
-        const nx=-dy/len, ny=dx/len;
-        const bow=Math.min(45, len*0.09);
-        // Original bow was +left-of-A→B; reversed is +left-of-B→A = -left-of-A→B
-        cx=mx-nx*bow; cy=my-ny*bow;
-    } else {
-        // Mesh: outward bow from pentagon centre is symmetric for either direction
-        const dcx=mx-MESH_CX, dcy=my-MESH_CY;
-        const dlen=Math.hypot(dcx,dcy)||1;
-        const bow=Math.min(110, len*0.26);
-        cx=mx+dcx/dlen*bow; cy=my+dcy/dlen*bow;
+    if(edge.type==='vert'){
+        const sx=B.x+NW/2, sy=B.y+NH;   // now B is source
+        const ex=A.x+NW/2, ey=A.y;
+        const midY=sy+(ey-sy)/2;
+        return `M${sx} ${sy} L${sx} ${midY} L${ex} ${midY} L${ex} ${ey}`;
     }
-    return `M${ax} ${ay} Q${cx} ${cy} ${bx} ${by}`;
+    if(edge.type==='horiz'){
+        const sx=B.x, sy=B.y+NH/2;
+        const ex=A.x+NW, ey=A.y+NH/2;
+        return `M${sx} ${sy} L${ex} ${ey}`;
+    }
+    if(edge.type==='curve'){
+        // reverse: jira → qlik
+        const ax=B.x+NW, ay=B.y+NH/2;  // jira right
+        const bx=A.x+NW, by=A.y+NH/2;  // qlik right
+        const cx1=ax+190, cy1=ay;
+        const cx2=bx+170, cy2=by;
+        return `M${ax} ${ay} C${cx1} ${cy1},${cx2} ${cy2},${bx} ${by}`;
+    }
+    return path;
 };
 
 // ─── AGENT ROBOT (original style) ─────────────────────────────────────────────
-const AgentRobot = ({node, isSelected}) => {
-    const isRunning  = node.status==='running';
-    const isHealing  = node.status==='healing';
-    const isDone     = node.status==='completed';
-    const isError    = node.status==='error';
-    const isBlinking = node.status==='blinking';
+const AgentRobot = ({node}) => {
+    const isRunning = node.status==='running';
+    const isHealing = node.status==='healing';
+    const isDone    = node.status==='completed';
+    const isError   = node.status==='error';
 
     const pc = isError?'#EF4444':isDone?'#10B981':isHealing?'#F59E0B':
-               (isRunning||isBlinking)?node.color:'#6B7280';
+               isRunning?node.color:'#6B7280';
 
     return (
         <div style={{position:'relative', display:'flex', flexDirection:'column', alignItems:'center', width:128}}>
 
-            {/* ── AURA: robot silhouette glow via drop-shadow filter ── */}
+            {/* ── NEO GLOW (behind robot, only when running/done) ── */}
+            {(isRunning||isDone) && (
+                <div style={{
+                    position:'absolute', top:'58%', left:'50%',
+                    transform:'translate(-50%,-50%)',
+                    width: isRunning?260:200, height: isRunning?260:200,
+                    borderRadius:'50%',
+                    background:`radial-gradient(circle, ${node.color}${isRunning?'55':'28'} 0%, transparent 68%)`,
+                    pointerEvents:'none', zIndex:0,
+                    animation: isRunning?'neo-pulse 2s ease-in-out infinite':'none',
+                }}>
+                    {isRunning && (
+                        <div style={{
+                            position:'absolute', inset:0, borderRadius:'50%',
+                            border:`2px solid ${node.color}60`,
+                            animation:'neo-ring 2s ease-out infinite',
+                        }}/>
+                    )}
+                </div>
+            )}
+
             <motion.div
-                animate={{
-                    y:[0,-12,0],
-                    filter:(isRunning||isHealing)?[
-                        `drop-shadow(0 0 4px ${pc}aa) drop-shadow(0 0 14px ${pc}55)`,
-                        `drop-shadow(0 0 14px ${pc}) drop-shadow(0 0 32px ${pc}99) drop-shadow(0 0 56px ${pc}44)`,
-                        `drop-shadow(0 0 4px ${pc}aa) drop-shadow(0 0 14px ${pc}55)`,
-                    ]:isBlinking?[
-                        `drop-shadow(0 0 4px ${pc}88) drop-shadow(0 0 12px ${pc}33)`,
-                        `drop-shadow(0 0 22px ${pc}) drop-shadow(0 0 44px ${pc}bb) drop-shadow(0 0 72px ${pc}55)`,
-                        `drop-shadow(0 0 4px ${pc}88) drop-shadow(0 0 12px ${pc}33)`,
-                    ]:isDone?`drop-shadow(0 0 8px ${pc}99) drop-shadow(0 0 18px ${pc}44)`:
-                      isSelected?`drop-shadow(0 0 12px ${pc}88) drop-shadow(0 0 28px ${pc}44)`:'none',
-                }}
-                transition={{
-                    y:{duration:3.5,repeat:Infinity,ease:'easeInOut'},
-                    filter:(isRunning||isHealing)?{duration:1.6,repeat:Infinity,ease:'easeInOut'}:
-                           isBlinking?{duration:0.55,repeat:Infinity,ease:'easeInOut'}:{duration:0.4},
-                }}
+                animate={{y:[0,-12,0]}}
+                transition={{duration:3.5,repeat:Infinity,ease:'easeInOut'}}
                 style={{position:'relative',zIndex:1,width:96,display:'flex',flexDirection:'column',alignItems:'center'}}
             >
                 {/* Antenna */}
@@ -403,9 +370,6 @@ const AgentRobot = ({node, isSelected}) => {
                         {isRunning ? (
                             <motion.div animate={{x:[-12,12,-12]}} transition={{duration:1.5,repeat:Infinity,ease:'linear'}}
                                 style={{width:16,height:8,borderRadius:9999,background:pc,boxShadow:`0 0 10px ${pc}`}}/>
-                        ) : isBlinking ? (
-                            <motion.div animate={{opacity:[1,0,1]}} transition={{duration:0.55,repeat:Infinity}}
-                                style={{width:16,height:8,borderRadius:9999,background:pc,boxShadow:`0 0 14px ${pc}`}}/>
                         ) : isHealing ? (
                             <motion.div animate={{rotate:360}} transition={{duration:2,repeat:Infinity,ease:'linear'}}
                                 style={{width:12,height:12,borderRadius:'50%',border:`2px dashed ${pc}`}}/>
@@ -450,11 +414,11 @@ const AgentRobot = ({node, isSelected}) => {
 
             {/* Label */}
             <div style={{marginTop:24,display:'flex',flexDirection:'column',alignItems:'center',zIndex:10}}>
-                <span style={{fontWeight:700,fontSize:11,letterSpacing:2,color:'white',background:'rgba(0,0,0,0.6)',padding:'3px 12px',borderRadius:9999,border:`1px solid ${isSelected?node.color+'88':'rgba(255,255,255,0.1)'}`,backdropFilter:'blur(8px)',whiteSpace:'nowrap',boxShadow:isSelected?`0 0 12px ${node.color}44`:'none',transition:'all 0.3s'}}>
+                <span style={{fontWeight:700,fontSize:11,letterSpacing:2,color:'white',background:'rgba(0,0,0,0.6)',padding:'3px 12px',borderRadius:9999,border:'1px solid rgba(255,255,255,0.1)',backdropFilter:'blur(8px)',whiteSpace:'nowrap'}}>
                     {node.label}
                 </span>
                 <span style={{fontSize:9,textTransform:'uppercase',fontWeight:700,letterSpacing:2,marginTop:4,padding:'1px 8px',borderRadius:3,background:'rgba(0,0,0,0.4)',color:pc,whiteSpace:'nowrap'}}>
-                    {isBlinking?'QUEUED':node.status}{node.time&&node.time!=='-'?` (${node.time})`:''}
+                    {node.status}{node.time&&node.time!=='-'?` (${node.time})`:''}
                 </span>
             </div>
         </div>
@@ -463,47 +427,36 @@ const AgentRobot = ({node, isSelected}) => {
 
 // ─── MAIN APP ─────────────────────────────────────────────────────────────────
 const App = () => {
-    const [nodes,setNodes]               = useState(NODES_INIT);
-    const [history,setHistory]           = useState([]);
-    const [current,setCurrent]           = useState([]);
-    const [prompt,setPrompt]             = useState(null);
-    const [inputVal,setInputVal]         = useState('');
-    const [wsState,setWsState]           = useState('connecting');
-    const [activePlanes,setActivePlanes] = useState([]);
-    const [containerH,setContainerH]     = useState(0);
-    const [selectedAgent,setSelectedAgent] = useState(null);
-    const ws             = useRef(null);
-    const termEndRef     = useRef(null);
-    const termBodyRef    = useRef(null);
-    const nodesRef       = useRef(nodes);
-    const activeAgentRef = useRef(null);  // tracks which agent phase is current
-    const qlikJiraSubflowRef = useRef(false);  // true while Qlik has delegated to JIRA
+    const [nodes,setNodes]         = useState(NODES_INIT);
+    const [terminal,setTerminal]   = useState([]);
+    const [prompt,setPrompt]       = useState(null);
+    const [inputVal,setInputVal]   = useState('');
+    const [wsState,setWsState]     = useState('connecting');
+    const [activePlane,setActivePlane] = useState(null);
+    const ws         = useRef(null);
+    const termEndRef = useRef(null);
+    const nodesRef   = useRef(nodes);
 
     useEffect(()=>{ nodesRef.current = nodes; }, [nodes]);
-    // Track terminal container height so the active section always fills the viewport
-    useEffect(()=>{
-        if (!termBodyRef.current) return;
-        const ro = new ResizeObserver(entries => {
-            setContainerH(entries[0].contentRect.height);
-        });
-        ro.observe(termBodyRef.current);
-        return () => ro.disconnect();
-    }, []);
-    // Auto-scroll to bottom whenever active session or prompt changes
-    useEffect(()=>{ termEndRef.current?.scrollIntoView({behavior:'smooth'}); }, [current,prompt]);
+    useEffect(()=>{ termEndRef.current?.scrollIntoView({behavior:'smooth'}); }, [terminal,prompt]);
 
-    const addLine   = t => setCurrent(p=>[...p,t]);
+    const addLine   = t       => setTerminal(p=>[...p,t]);
     const upNode    = (id,u)  => setNodes(ns=>ns.map(n=>n.id===id?{...n,...u}:n));
-    const flyPlane  = (edgeId,fromId,toId,color) => setActivePlanes([{edgeId,fromId,toId,color}]);
-    const flyPlanes = (planes) => setActivePlanes(planes);
-    const stopPlane = ()      => setActivePlanes([]);
+    const flyPlane  = (edgeId,fromId,toId,color) => setActivePlane({edgeId,fromId,toId,color});
+    const stopPlane = ()      => setActivePlane(null);
 
-    // ── WebSocket setup — extracted so turbine can reconnect ──────────────────
-    const attachWS = React.useCallback((socket) => {
-        socket.onopen  = () => { console.log('[WS] Connected'); setWsState('ready_to_start'); };
-        socket.onclose = (e) => { console.warn('[WS] Closed:', e.code, e.reason); setWsState('disconnected'); };
-        socket.onerror = (e) => { console.error('[WS] Error:', e); };
-        socket.onmessage = (event) => {
+    // ── Direct WebSocket — simple and reliable ─────────────────────────────────
+    useEffect(() => {
+        console.log('[WS] Creating WebSocket connection...');
+        ws.current = new WebSocket('ws://localhost:8000/ws');
+
+        ws.current.onopen = () => { console.log('[WS] Connected!'); setWsState('ready_to_start'); };
+
+        ws.current.onclose = (e) => { console.warn('[WS] Closed:', e.code, e.reason); setWsState('disconnected'); };
+
+        ws.current.onerror = (e) => { console.error('[WS] Error:', e); };
+
+        ws.current.onmessage = (event) => {
             let data;
             try { data = JSON.parse(event.data); } catch(e) { console.error('[WS] JSON parse failed:', event.data); return; }
             console.log('[WS] Message:', data.type, data.message?.substring(0, 80));
@@ -514,68 +467,50 @@ const App = () => {
                 const m = data.message;
                 // JIRA
                 if (m.includes('Jira Agent analyzing ticket')) {
-                    activeAgentRef.current = 'jira';
-                    upNode('jira', {status:'blinking', time:'...'});
+                    const qn = nodesRef.current.find(n=>n.id==='qlik');
+                    if (qn && qn.status==='running') flyPlane('q-j','qlik','jira','#22C55E');
+                    upNode('jira', {status:'running', time:'...'});
                 }
                 if (m.includes('TICKET REQUIREMENTS')) {
                     upNode('jira', {status:'completed', time:'Done'});
-                    if (qlikJiraSubflowRef.current) {
-                        // JIRA finished the Qlik-requested ticket → hand back to Qlik.
-                        // Two links feed Qlik: requirements (JIRA) + VDS (Dremio).
-                        qlikJiraSubflowRef.current = false;
-                        activeAgentRef.current = 'qlik';
-                        upNode('qlik', {status:'blinking', time:'...'});
-                        flyPlanes([
-                            {edgeId:'j-q',  fromId:'jira',   toId:'qlik', color:'#3B82F6'},
-                            {edgeId:'dr-q', fromId:'dremio', toId:'qlik', color:'#F97316'},
-                        ]);
-                    } else {
-                        activeAgentRef.current = 'doc';
-                        flyPlane('j-d','jira','doc','#3B82F6');
-                    }
+                    const qn = nodesRef.current.find(n=>n.id==='qlik');
+                    if (qn && qn.status==='running') flyPlane('q-j','jira','qlik','#3B82F6');
+                    else flyPlane('j-d','jira','doc','#3B82F6');
                 }
                 // DOC
-                if (m.includes('DOCUMENTATION AGENT')) { activeAgentRef.current = 'doc'; upNode('doc', {status:'blinking', time:'...'}); }
+                if (m.includes('DOCUMENTATION AGENT')) upNode('doc', {status:'running', time:'...'});
                 if (m.includes('Document saved:')) {
-                    activeAgentRef.current = 'dremio';
                     upNode('doc', {status:'completed', time:'Done'});
                     flyPlane('d-dr','doc','dremio','#10B981');
                 }
                 // DREMIO
-                if (m.includes('DREMIO AGENT'))    { activeAgentRef.current = 'dremio'; upNode('dremio', {status:'blinking', time:'...'}); }
+                if (m.includes('DREMIO AGENT'))    upNode('dremio', {status:'running', time:'...'});
                 if (m.includes('Validation FAILED')) upNode('dremio', {status:'error'});
                 if (m.includes('Intercepting error') || m.includes('auto-fix') || m.includes('Rewriting SQL')) upNode('dremio', {status:'healing'});
                 if (m.includes('VDS created successfully')) {
-                    activeAgentRef.current = 'qlik';
                     upNode('dremio', {status:'completed', time:'Done'});
                     flyPlane('dr-q','dremio','qlik','#F97316');
                 }
                 // QLIK
-                if (m.includes('QLIK AGENT')) { activeAgentRef.current = 'qlik'; upNode('qlik', {status:'blinking', time:'...'}); }
-                // Qlik delegates to JIRA: browse Qlik ticket menu appeared → JIRA takes over.
-                if ((m.includes('existing Qlik ticket') || m.includes('Qlik backlog')) && !qlikJiraSubflowRef.current) {
-                    qlikJiraSubflowRef.current = true;
-                    activeAgentRef.current = 'jira';
-                    upNode('jira', {status:'blinking', time:'...'});
-                    upNode('qlik', {status:'running', time:'...'});  // delegated → steady glow
-                    flyPlane('j-q','qlik','jira','#22C55E');          // Qlik → JIRA request
+                if (m.includes('QLIK AGENT')) upNode('qlik', {status:'running', time:'...'});
+                if (m.includes('separate JIRA ticket for Qlik?') && nodesRef.current.find(n=>n.id==='qlik')?.status==='running') {
+                    flyPlane('q-j','qlik','jira','#22C55E');
                 }
                 if (m.includes('QLIK SENSE DASHBOARD READY')) {
-                    activeAgentRef.current = 'git';
                     upNode('qlik', {status:'completed', time:'Done'});
                     flyPlane('q-g','qlik','git','#22C55E');
                 }
                 // GIT
-                if (m.includes('GITHUB AGENT') || m.includes('Validating local codebase')) { activeAgentRef.current = 'git'; upNode('git', {status:'blinking', time:'...'}); }
-                if (m.includes('WORKFLOW COMPLETE')) { activeAgentRef.current = null; upNode('git', {status:'completed', time:'Done'}); stopPlane(); }
+                if (m.includes('GITHUB AGENT') || m.includes('Validating local codebase')) upNode('git', {status:'running', time:'...'});
+                if (m.includes('WORKFLOW COMPLETE')) { upNode('git', {status:'completed', time:'Done'}); stopPlane(); }
 
             } else if (data.type === 'prompt') {
                 setPrompt(data.message);
                 setWsState('waiting_input');
-                // Force the active agent to blinking on every prompt — stays glowing
-                // for the whole phase (no 'waiting' gray-out, which killed the glow).
-                const aid = activeAgentRef.current;
-                if (aid) setNodes(ns => ns.map(n => n.id === aid ? {...n, status:'blinking'} : n));
+                if (data.message.includes('Select option') || data.message.includes('Select sprint') ||
+                    data.message.includes('Select ticket') || data.message.includes('Select assignee')) {
+                    upNode('jira', {status:'waiting'});
+                }
             } else if (data.type === 'error') {
                 addLine(`[SYSTEM ERROR] ${data.message}`);
             } else if (data.type === 'done') {
@@ -583,34 +518,18 @@ const App = () => {
             }
             } catch(err) { console.error('[WS] Handler error:', err); }
         };
+
+        return () => ws.current.close();
     }, []);
-
-    const connectWS = React.useCallback(() => {
-        if (ws.current && ws.current.readyState < 2) ws.current.close();
-        console.log('[WS] Connecting...');
-        setWsState('connecting');
-        const socket = new WebSocket('ws://localhost:8000/ws');
-        ws.current = socket;
-        attachWS(socket);
-    }, [attachWS]);
-
-    useEffect(() => {
-        connectWS();
-        return () => { if(ws.current) ws.current.close(); };
-    }, []);  // eslint-disable-line react-hooks/exhaustive-deps
 
     const handleSubmit = e => {
         e.preventDefault();
         if (!prompt) return;
-        const echo = '  → ' + inputVal;
+        console.log('[SUBMIT] Sending:', inputVal);
+        addLine('  → ' + inputVal);
         ws.current.send(inputVal);
         setInputVal(''); setPrompt(null); setWsState('processing');
-        // Active agent keeps blinking until a log message marks it completed.
-        // Flush active session (+ echo of answer) into history; start fresh
-        setCurrent(prev => {
-            setHistory(h => [...h, [...prev, echo]]);
-            return [];
-        });
+        setNodes(ns => ns.map(n => n.status==='waiting' ? {...n, status:'pending'} : n));
     };
     const isSpinning = ['processing','waiting_input'].includes(wsState);
     const nodesMap   = Object.fromEntries(nodes.map(n=>[n.id,n]));
@@ -625,53 +544,10 @@ const App = () => {
                 </video>
 
                 {/* Header */}
-                <div className="glass" style={{height:68,display:'flex',alignItems:'center',padding:'0 24px',justifyContent:'space-between',borderBottom:'1px solid rgba(255,255,255,0.08)',position:'relative',zIndex:20}}>
+                <div className="glass" style={{height:56,display:'flex',alignItems:'center',padding:'0 24px',justifyContent:'space-between',borderBottom:'1px solid rgba(255,255,255,0.08)',position:'relative',zIndex:20}}>
                     <div style={{display:'flex',alignItems:'center',gap:16}}>
-                        {/* ASL logo — white card, shadow ring, generous padding for sharpness */}
-                        <div style={{
-                            background:'#ffffff',
-                            borderRadius:8,
-                            padding:'7px 16px',
-                            display:'flex',
-                            alignItems:'center',
-                            justifyContent:'center',
-                            boxShadow:'0 0 0 1.5px rgba(27,58,107,0.30), 0 2px 12px rgba(27,58,107,0.20), 0 0 28px rgba(89,163,217,0.18)',
-                            flexShrink:0, minWidth:'max-content',
-                        }}>
-                            <img
-                                src="/image/asllogo.jpg"
-                                alt="ASL Airlines Belgium"
-                                style={{
-                                    height:38,
-                                    width:'auto',
-                                    display:'block',
-                                    objectFit:'contain',
-                                    imageRendering:'auto',
-                                }}
-                                onError={e=>{
-                                    /* fallback: try jfif, then hide */
-                                    const t = e.currentTarget;
-                                    if(!t.dataset.tried){t.dataset.tried='1';t.src='/image/asllogo.jfif';}
-                                    else{t.style.display='none';}
-                                }}
-                            />
-                        </div>
-                        {/* Vertical rule in ASL navy */}
-                        <div style={{width:1,height:44,background:'linear-gradient(180deg,transparent,rgba(27,58,107,0.6) 20%,rgba(89,163,217,0.4) 50%,rgba(27,58,107,0.6) 80%,transparent)',flexShrink:0}}/>
-                        {/* 3-D gradient title */}
-                        <h1 style={{
-                            margin:0,
-                            fontWeight:800,
-                            fontSize:16,
-                            letterSpacing:'0.6px',
-                            lineHeight:1,
-                            background:'linear-gradient(180deg, #A8D8F0 0%, #5BA3D9 42%, #1B3A6B 100%)',
-                            WebkitBackgroundClip:'text',
-                            WebkitTextFillColor:'transparent',
-                            backgroundClip:'text',
-                            animation:'title-glow 3s ease-in-out infinite',
-                            whiteSpace:'nowrap',
-                        }}>DataLake Workflow Orchestrator</h1>
+                        <img src="https://aslairlines.be/wp-content/uploads/2022/09/asl_belgium_white_logo.png" alt="ASL" style={{height:22,objectFit:'contain'}}/>
+                        <h1 style={{fontWeight:600,fontSize:14,letterSpacing:1,color:'#e2e8f0'}}>DataLake Workflow Orchestrator</h1>
                     </div>
                     <div style={{display:'flex',alignItems:'center',gap:12}}>
                         <div style={{display:'flex',gap:6}}>
@@ -687,8 +563,8 @@ const App = () => {
                 </div>
 
                 {/* Canvas */}
-                <div style={{flex:1,position:'relative',overflow:'auto',zIndex:10,display:'flex',justifyContent:'center',alignItems:'flex-start',paddingTop:30,paddingBottom:30}}>
-                    <div style={{position:'relative',width:980,height:960,flexShrink:0}}>
+                <div style={{flex:1,position:'relative',overflow:'auto',zIndex:10}}>
+                    <div style={{position:'relative',minWidth:1050,minHeight:1200,padding:40}}>
                         {/* Edges SVG layer */}
                         <svg style={{position:'absolute',inset:0,width:'100%',height:'100%',pointerEvents:'none',zIndex:0}}>
                             <defs>
@@ -697,12 +573,8 @@ const App = () => {
                                     <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
                                 </filter>
                             </defs>
-                            {/* Render mesh cross-links first (behind), flow edges on top */}
-                            {EDGE_DEFS.filter(e=>e.type==='mesh').map(edge=>(
-                                <Edge key={edge.id} edge={edge} nodesMap={nodesMap} activePlanes={activePlanes}/>
-                            ))}
-                            {EDGE_DEFS.filter(e=>e.type==='flow').map(edge=>(
-                                <Edge key={edge.id} edge={edge} nodesMap={nodesMap} activePlanes={activePlanes}/>
+                            {EDGE_DEFS.map(edge=>(
+                                <Edge key={edge.id} edge={edge} nodesMap={nodesMap} activePlane={activePlane}/>
                             ))}
                         </svg>
                         {/* Nodes */}
@@ -710,7 +582,7 @@ const App = () => {
                             <motion.div key={node.id}
                                 style={{position:'absolute',left:node.x,top:node.y,zIndex:10}}
                                 initial={{opacity:0,scale:.9}} animate={{opacity:1,scale:1}}>
-                                <AgentRobot node={node} isSelected={selectedAgent===node.id&&wsState==='ready_to_start'}/>
+                                <AgentRobot node={node}/>
                             </motion.div>
                         ))}
                     </div>
@@ -723,57 +595,9 @@ const App = () => {
                 {/* Turbine engine button */}
                 <div className="engine-panel">
                     <div className="engine-label">Engine Control Unit</div>
-
-                    {/* Agent Start Selector — visible when connected and idle */}
-                    {(wsState==='ready_to_start'||wsState==='done') && (
-                        <div style={{width:'100%',marginBottom:14}}>
-                            <div style={{fontFamily:'Orbitron,monospace',fontSize:7,letterSpacing:'2px',color:'rgba(0,180,255,0.35)',marginBottom:7,textAlign:'center'}}>
-                                START FROM AGENT
-                            </div>
-                            <div style={{display:'flex',flexWrap:'wrap',gap:4,justifyContent:'center'}}>
-                                {NODES_INIT.map(n=>{
-                                    const short=n.id==='doc'?'Doc':n.id==='git'?'Git':n.id.charAt(0).toUpperCase()+n.id.slice(1);
-                                    const sel=selectedAgent===n.id;
-                                    return (
-                                        <button key={n.id}
-                                            onClick={()=>setSelectedAgent(s=>s===n.id?null:n.id)}
-                                            style={{
-                                                background:sel?`${n.color}22`:'rgba(255,255,255,0.03)',
-                                                border:`1px solid ${sel?n.color:'rgba(255,255,255,0.1)'}`,
-                                                color:sel?n.color:'rgba(255,255,255,0.38)',
-                                                padding:'4px 10px',borderRadius:4,cursor:'pointer',
-                                                fontFamily:'JetBrains Mono,monospace',fontSize:9,
-                                                letterSpacing:'0.5px',transition:'all 0.18s',
-                                                boxShadow:sel?`0 0 10px ${n.color}33`:'none',
-                                            }}>
-                                            {short}
-                                        </button>
-                                    );
-                                })}
-                            </div>
-                            {selectedAgent && (
-                                <div style={{textAlign:'center',marginTop:6,fontFamily:'JetBrains Mono,monospace',fontSize:8,color:'rgba(0,180,255,0.45)',letterSpacing:'1px'}}>
-                                    ↳ {NODES_INIT.find(n=>n.id===selectedAgent)?.label}
-                                </div>
-                            )}
-                        </div>
-                    )}
-
                     <motion.button className="turb-btn"
-                        onClick={()=>{
-                            if(wsState==='ready_to_start'){
-                                ws.current.send("START_WORKFLOW");
-                                setWsState("processing");
-                                setHistory([]);setCurrent([]);
-                                stopPlane();
-                                qlikJiraSubflowRef.current = false;
-                                activeAgentRef.current = selectedAgent || 'jira';
-                                setNodes(NODES_INIT.map(n=>n.id===activeAgentRef.current?{...n,status:'blinking'}:n));
-                                setSelectedAgent(null);
-                            }
-                            else if(wsState==='disconnected'||wsState==='done'){connectWS();}
-                        }}
-                        disabled={isSpinning||wsState==='connecting'}
+                        onClick={()=>{if(wsState==='ready_to_start'){ws.current.send("START_WORKFLOW");setWsState("processing");}}}
+                        disabled={wsState!=='ready_to_start'}
                         whileHover={wsState==='ready_to_start'?{scale:1.05}:{}}
                         animate={isSpinning?{x:[-1,1,-1,1,0],y:[-1,1,-1,1,0]}:{}}
                         transition={isSpinning?{duration:.1,repeat:Infinity}:{}}
@@ -781,7 +605,7 @@ const App = () => {
                             borderRadius:'50%', padding:6,
                             background:isSpinning?'radial-gradient(circle,rgba(255,80,0,.15) 0%,transparent 70%)':'radial-gradient(circle,rgba(0,80,160,.15) 0%,transparent 70%)',
                             boxShadow:isSpinning?'0 0 60px rgba(255,100,0,.3)':wsState==='ready_to_start'?'0 0 40px rgba(0,180,255,.2)':'none',
-                            opacity:(wsState==='connecting')?0.5:1,
+                            opacity:wsState!=='ready_to_start'&&!isSpinning?.38:1,
                         }}>
                         <TurbineSVG spinning={isSpinning} idle={wsState==='ready_to_start'}/>
                     </motion.button>
@@ -811,53 +635,32 @@ const App = () => {
                 <div style={{padding:'8px 18px',borderBottom:'1px solid rgba(0,180,255,0.14)',background:'rgba(0,180,255,0.03)',display:'flex',alignItems:'center',gap:8}}>
                     <Activity size={13} color="#00b4ff"/>
                     <span style={{fontFamily:'Orbitron,monospace',fontSize:8,letterSpacing:'3px',textTransform:'uppercase',color:'rgba(0,180,255,0.7)'}}>Executive Event Log</span>
-                    <span style={{marginLeft:'auto',fontFamily:'JetBrains Mono',fontSize:10,color:'rgba(0,180,255,0.3)'}}>{history.reduce((s,sess)=>s+sess.length,0)+current.length} LINES</span>
+                    <span style={{marginLeft:'auto',fontFamily:'JetBrains Mono',fontSize:10,color:'rgba(0,180,255,0.3)'}}>{terminal.length} LINES</span>
                 </div>
 
                 {/* Terminal body */}
-                <div ref={termBodyRef} style={{flex:1,overflowY:'auto',overflowX:'auto',padding:'0 12px 12px',display:'flex',flexDirection:'column'}}>
-
-                    {/* ── HISTORY: past sessions pushed into scrollback ── */}
-                    {history.map((session,si)=>(
-                        <div key={si} style={{flexShrink:0, minWidth:'max-content', paddingTop:12, borderBottom:'1px solid rgba(0,180,255,0.08)', paddingBottom:8, marginBottom:4}}>
-                            {session.map((line,li)=>{
-                                const isSep = line.startsWith('===');
-                                const isHdr = !isSep && (line.includes('AGENT')||line.includes('WORKFLOW')||line.includes('ASL AIRLINES'));
-                                const isErr = line.startsWith('[SYSTEM ERROR]');
-                                const cls   = `t-line${isSep?' t-sep':isHdr?' t-hdr':isErr?' t-err':''}`;
-                                return (
-                                    <div key={li} className={cls} style={{opacity:0.55}}>
-                                        {!isSep && !isHdr && !isErr && <span style={{color:'rgba(0,180,255,0.18)',marginRight:6}}>›</span>}
-                                        {line}
-                                    </div>
-                                );
-                            })}
+                <div style={{flex:1,overflowY:'auto',padding:12,display:'flex',flexDirection:'column',gap:4}}>
+                    {terminal.length===0 && (
+                        <div className="t-empty">
+                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#00b4ff" strokeWidth="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                            <div className="t-empty-lbl">AWAITING PIPELINE ACTIVATION</div>
                         </div>
-                    ))}
-
-                    {/* ── ACTIVE SESSION: always fills the viewport height ── */}
-                    <div style={{flexShrink:0, minWidth:'max-content', minHeight: containerH ? containerH : '70vh', display:'flex', flexDirection:'column', paddingTop:12, gap:4}}>
-                        {history.length===0 && current.length===0 && (
-                            <div className="t-empty">
-                                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#00b4ff" strokeWidth="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-                                <div className="t-empty-lbl">AWAITING PIPELINE ACTIVATION</div>
+                    )}
+                    {terminal.map((line,i)=>{
+                        const isSep = line.startsWith('===');
+                        const isHdr = !isSep && (line.includes('AGENT')||line.includes('WORKFLOW')||line.includes('ASL AIRLINES'));
+                        const isErr = line.startsWith('[SYSTEM ERROR]');
+                        const cls   = `t-line${isSep?' t-sep':isHdr?' t-hdr':isErr?' t-err':''}`;
+                        return (
+                            <div key={i} className={cls}>
+                                {!isSep && !isHdr && !isErr && <span style={{color:'rgba(0,180,255,0.28)',marginRight:6}}>›</span>}
+                                {line}
                             </div>
-                        )}
-                        {current.map((line,i)=>{
-                            const isSep = line.startsWith('===');
-                            const isHdr = !isSep && (line.includes('AGENT')||line.includes('WORKFLOW')||line.includes('ASL AIRLINES'));
-                            const isErr = line.startsWith('[SYSTEM ERROR]');
-                            const cls   = `t-line${isSep?' t-sep':isHdr?' t-hdr':isErr?' t-err':''}`;
-                            return (
-                                <div key={i} className={cls}>
-                                    {!isSep && !isHdr && !isErr && <span style={{color:'rgba(0,180,255,0.28)',marginRight:6}}>›</span>}
-                                    {line}
-                                </div>
-                            );
-                        })}
+                        );
+                    })}
 
-                        {/* Prompt input */}
-                        {prompt && (
+                    {/* Prompt input */}
+                    {prompt && (
                         <motion.div initial={{opacity:0,y:6}} animate={{opacity:1,y:0}} className="t-prompt-wrap">
                             <span className="t-prompt-text">{prompt}</span>
                             <form style={{flex:1,display:'flex',alignItems:'center',gap:6}} onSubmit={handleSubmit}>
@@ -866,10 +669,9 @@ const App = () => {
                                 <div className="t-cursor"/>
                             </form>
                         </motion.div>
-                        )}
-                        <div ref={termEndRef}/>
-                    </div>{/* end active session */}
-                </div>{/* end terminal body */}
+                    )}
+                    <div ref={termEndRef}/>
+                </div>
 
                 {/* Footer */}
                 <div style={{padding:'6px 18px',borderTop:'1px solid rgba(0,180,255,0.12)',background:'rgba(0,0,0,0.55)',display:'flex',justifyContent:'space-between'}}>

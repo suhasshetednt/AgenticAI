@@ -1,0 +1,2697 @@
+INFO:     Started server process [11600]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
+INFO:     127.0.0.1:62500 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65219 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65288 - "WebSocket /ws" [accepted]
+INFO:     connection open
+INFO:     127.0.0.1:65291 - "WebSocket /ws" [accepted]
+INFO:     connection open
+INFO:     127.0.0.1:65221 - "GET / HTTP/1.1" 200 OK
+UI disconnected.
+UI disconnected.
+INFO:     connection closed
+INFO:     connection closed
+
+==============================================================
+  SELECT PROJECT
+==============================================================
+  Loading projects ...
+INFO:     127.0.0.1:65489 - "WebSocket /ws" [accepted]
+INFO:     connection open
+INFO:     127.0.0.1:65492 - "WebSocket /ws" [accepted]
+INFO:     connection open
+  [1] ADL        ASL Data Lake   (default)
+  [2] ASL        ASL Integration Framework
+  [3] PSUD       Process Set up Dummy 
+  [0] Cancel
+==============================================================
+  Select project number (Enter for ADL): 1
+
+  Project set to ADL  (board id 2).
+
+==============================================================
+  ASL AIRLINES  --  ADL WORKFLOW  |  JIRA -> DOC -> DREMIO -> QLIK
+==============================================================
+  [1]  Work on an existing ticket  (browse sprint)
+  [2]  Browse backlog tickets
+  [3]  Create a new ticket
+  [4]  GitHub version control assistant
+  [0]  Exit
+==============================================================
+  Select option: 1
+
+  Loading sprints ... done
+
+==============================================================
+  SELECT SPRINT
+==============================================================
+  -- Active Sprint --
+  [ 1]  ADL Sprint 48  [ACTIVE]  <-- default
+
+  -- Recent Closed Sprints --
+  [ 2]  ADL Sprint 47  [CLOSED]
+  [ 3]  ADL Sprint 46  [CLOSED]
+  [ 4]  ADL Sprint 45  [CLOSED]
+  [ 5]  ADL Sprint 44  [CLOSED]
+  [ 6]  ADL Sprint 43  [CLOSED]
+  [ 7]  ADL Sprint 42  [CLOSED]
+  [ 8]  ADL Sprint 41  [CLOSED]
+  [ 9]  ADL Sprint 40  [CLOSED]
+  [10]  ADL Sprint 39  [CLOSED]
+  [11]  ADL Sprint 38  [CLOSED]
+  [ 0]  Back
+==============================================================
+  Select sprint number: 1
+
+  Selected: ADL Sprint 48  [ACTIVE]
+
+  Fetching tickets for ADL Sprint 48 ... done  (133 tickets found)
+
+==============================================================
+  ASSIGNEES  --  ADL Sprint 48
+==============================================================
+  [ 1]  Dhruv Mevada  (5 tickets)
+  [ 2]  Fenil Jain  (1 ticket)
+  [ 3]  Harini Reddy Godhala  (1 ticket)
+  [ 4]  Harsh Sanghvi  (11 tickets)
+  [ 5]  Isha Metange  (37 tickets)
+  [ 6]  Marmik Patel  (12 tickets)
+  [ 7]  Parthesh  (24 tickets)
+  [ 8]  Rashmi Pathak  (22 tickets)
+  [ 9]  Suhas Shete  (16 tickets)
+  [10]  Unassigned  (2 tickets)
+  [11]  dhaval.dangi  (1 ticket)
+  [12]  kamal prakash  (1 ticket)
+  [ 0]  Back
+==============================================================
+  Select assignee number: 9
+
+==============================================================
+  TICKETS  --  Suhas Shete
+==============================================================
+   #   Key       Status            Priority  Summary
+  --   --------- ----------------- --------- ---------------------------------------------
+   1   ADL-1724  In Progress       Medium    [Incomplete Material Picking]  Add more fields to the...
+   2   ADL-1721  Ready for review  Medium    Create Production Document for Training Status Report
+   3   ADL-1718  To Do             Medium    [Movement Manager] Python script has been failing at m...
+   4   ADL-1716  Ready for review  Medium    [ Finance ] - Move all the Tally VDS from Dev folder t...
+   5   ADL-1703  Ready for review  Medium    SAP Data Catalog
+   6   ADL-1701  In Progress       Medium    [APU Health Monitor] Create Document technical solution
+   7   ADL-1700  In Progress       Medium    [APU Health Monitor] Create query for APU Health Monit...
+   8   ADL-1684  To Do             Medium    [ Amos Training report ] - Create Staff PQS Qualificat...
+   9   ADL-1662  Ready for review  Medium    Create AOG and AOG updates VDS under fleet_mgmt foder...
+  10   ADL-1656  On hold           Medium    [MM Discrepancy Report] Payload Missing 
+  11   ADL-1589  Ready for prod    Medium    [Finance - Masters]   Create Foreign Exchange Master V...
+  12   ADL-1588  Ready for prod    Medium    [Finance Dashboard - Prod Issue]  FX calculation logic...
+  13   ADL-1585  Ready for prod    Medium    [Finance] - Opening and Closing Balance Mismatch for B...
+  14   ADL-1576  Ready for prod    Medium    [Finance P&L- Document Currency] Document currency val...
+  15   ADL-1525  On hold           Medium    [AMOS Upgrade] All dashboards should be running as it...
+  16   ADL-902   On hold           Medium    [Eagle Eye] Reflection for technical delay is working...
+   0   Back
+==============================================================
+  Select ticket number: 7
+
+==============================================================
+  SELECTED TICKET : ADL-1700
+==============================================================
+  Sprint   : ADL Sprint 48  [ACTIVE]
+  Summary  : [APU Health Monitor] Create query for APU Health Monitor in Engine Folder
+  State    : In Progress
+  Priority : Medium
+  Assignee : Suhas Shete
+==============================================================
+
+  Fetching full ticket details ... done
+
+  Jira Agent analyzing ticket ... done
+
+==============================================================
+  TICKET REQUIREMENTS  (extracted by Jira Agent)
+==============================================================
+  Ticket  : ADL-1700
+  Summary : [APU Health Monitor] Create query for APU Health Monitor in Engine Folder
+
+  Business Requirement:
+    Create a query for APU Health Monitor that retrieves APU performance data from AMOS for APUs fitted to ASL AC Type B737NG aircraft. The query will join rotables and rotables_trend tables to extract APU part numbers, serial numbers, PSN identifiers, aircraft registration, reference dates, trend types (CT5), workorder information, and CT5ATP values, filtered for B737NG aircraft type and the latest reference date for each APU.
+
+  Source Database : amos_acceptance
+  Source Tables (3):
+    - amos.rotables
+    - amos.rotables_trend
+    - amos.aircraft
+
+  Output Fields (10):
+    - partno: APU Part Number
+    - serialno: APU Serial Number
+    - psn: Unique PSN associated with each APU Serial Number
+    - ac_registr: Aircraft Registration
+    - rt_psn: PSN from rotables_trend table
+    - ref_date: Reference Date (latest date only for each APU)
+    - trend_type: Trend Type (CT5)
+    - event_perfno_i: Workorder if present
+    - value: CT5ATP value
+    - ac_typ: Aircraft Type
+
+  Transformations (4):
+    - Join rotables table with rotables_trend table on PSN field
+    - Join result with aircraft table on aircraft registration to obtain aircraft type
+    - For each APU (identified by PSN), select only the row with the latest ref_date
+    - Filter trend_type to only include CT5 records
+
+  Filters (3):
+    - aircraft.ac_typ = 'B737NG'
+    - rotables_trend.trend_type = 'CT5'
+    - rotables_trend.ref_date is the maximum date for each unique PSN
+
+  Acceptance Criteria (7):
+    - Query returns all APUs of type B737NG with their associated part numbers and serial numbers
+    - Only the latest reference date is returned for each APU
+    - CT5ATP values are correctly populated from rotables_trend.value
+    - Workorder information is included when present in event_perfno_i
+    - VDS is created in Engine Folder in Dremio
+    - Query executes successfully against AMOS Acceptance database
+    - All output fields match the Report entry column names as specified
+==============================================================
+  Proceed to Documentation + Dremio Agent? [y/n]: y
+
+==============================================================
+  DOCUMENTATION AGENT  �  Technical Implementation Document
+==============================================================
+  Generating Technical Implementation Document from ticket requirements ...
+  (This calls the configured LLM � may take 15�30 seconds)
+
+
+  Document saved: E:\LLM\Claude\Project Documentation\ADL-1700_20260606_221644.docx
+  Open it in Word for review and sign-off.
+
+  Proceed to Dremio Agent? [y/n]: y
+  Cooling down 5s to reset API rate limit window ... ready.
+
+
+==============================================================
+  DREMIO AGENT  --  Select Operation
+==============================================================
+  [1] Generate VDS query from ticket requirements  (recommended)
+  [2] Preview existing table or view
+  [3] Browse catalog folder / list views
+  [4] Execute a SQL query
+  [5] Validate SQL
+  [6] Create Virtual Dataset (provide SQL manually)
+  [7] Update existing VDS
+  [8] Free-text query (ask the Dremio Agent anything)
+  [0] Exit Dremio Agent
+==============================================================
+  Select option: INFO:     127.0.0.1:61185 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63032 - "GET / HTTP/1.1" 200 OK
+UI disconnected.
+INFO:     connection closed
+INFO:     connection closed
+UI disconnected.
+INFO:     127.0.0.1:63129 - "WebSocket /ws" [accepted]
+INFO:     connection open
+INFO:     127.0.0.1:63131 - "WebSocket /ws" [accepted]
+INFO:     connection open
+
+==============================================================
+  SELECT PROJECT
+==============================================================
+  Loading projects ...
+  [1] ADL        ASL Data Lake   (default)
+  [2] ASL        ASL Integration Framework
+  [3] PSUD       Process Set up Dummy 
+  [0] Cancel
+==============================================================
+  Select project number (Enter for ADL): INFO:     127.0.0.1:63033 - "GET / HTTP/1.1" 200 OK
+UI disconnected.
+UI disconnected.
+INFO:     connection closed
+INFO:     connection closed
+INFO:     127.0.0.1:63318 - "WebSocket /ws" [accepted]
+INFO:     connection open
+INFO:     127.0.0.1:63321 - "WebSocket /ws" [accepted]
+INFO:     connection open
+
+==============================================================
+  SELECT PROJECT
+==============================================================
+  Loading projects ...
+  [1] ADL        ASL Data Lake   (default)
+  [2] ASL        ASL Integration Framework
+  [3] PSUD       Process Set up Dummy 
+  [0] Cancel
+==============================================================
+  Select project number (Enter for ADL): 1
+
+  Project set to ADL  (board id 2).
+
+==============================================================
+  ASL AIRLINES  --  ADL WORKFLOW  |  JIRA -> DOC -> DREMIO -> QLIK
+==============================================================
+  [1]  Work on an existing ticket  (browse sprint)
+  [2]  Browse backlog tickets
+  [3]  Create a new ticket
+  [4]  GitHub version control assistant
+  [0]  Exit
+==============================================================
+  Select option: 1
+
+  Loading sprints ... done
+
+==============================================================
+  SELECT SPRINT
+==============================================================
+  -- Active Sprint --
+  [ 1]  ADL Sprint 48  [ACTIVE]  <-- default
+
+  -- Recent Closed Sprints --
+  [ 2]  ADL Sprint 47  [CLOSED]
+  [ 3]  ADL Sprint 46  [CLOSED]
+  [ 4]  ADL Sprint 45  [CLOSED]
+  [ 5]  ADL Sprint 44  [CLOSED]
+  [ 6]  ADL Sprint 43  [CLOSED]
+  [ 7]  ADL Sprint 42  [CLOSED]
+  [ 8]  ADL Sprint 41  [CLOSED]
+  [ 9]  ADL Sprint 40  [CLOSED]
+  [10]  ADL Sprint 39  [CLOSED]
+  [11]  ADL Sprint 38  [CLOSED]
+  [ 0]  Back
+==============================================================
+  Select sprint number: 1
+
+  Selected: ADL Sprint 48  [ACTIVE]
+
+  Fetching tickets for ADL Sprint 48 ... done  (133 tickets found)
+
+==============================================================
+  ASSIGNEES  --  ADL Sprint 48
+==============================================================
+  [ 1]  Dhruv Mevada  (5 tickets)
+  [ 2]  Fenil Jain  (1 ticket)
+  [ 3]  Harini Reddy Godhala  (1 ticket)
+  [ 4]  Harsh Sanghvi  (11 tickets)
+  [ 5]  Isha Metange  (37 tickets)
+  [ 6]  Marmik Patel  (12 tickets)
+  [ 7]  Parthesh  (24 tickets)
+  [ 8]  Rashmi Pathak  (22 tickets)
+  [ 9]  Suhas Shete  (16 tickets)
+  [10]  Unassigned  (2 tickets)
+  [11]  dhaval.dangi  (1 ticket)
+  [12]  kamal prakash  (1 ticket)
+  [ 0]  Back
+==============================================================
+  Select assignee number: 9
+
+==============================================================
+  TICKETS  --  Suhas Shete
+==============================================================
+   #   Key       Status            Priority  Summary
+  --   --------- ----------------- --------- ---------------------------------------------
+   1   ADL-1724  In Progress       Medium    [Incomplete Material Picking]  Add more fields to the...
+   2   ADL-1721  Ready for review  Medium    Create Production Document for Training Status Report
+   3   ADL-1718  To Do             Medium    [Movement Manager] Python script has been failing at m...
+   4   ADL-1716  Ready for review  Medium    [ Finance ] - Move all the Tally VDS from Dev folder t...
+   5   ADL-1703  Ready for review  Medium    SAP Data Catalog
+   6   ADL-1701  In Progress       Medium    [APU Health Monitor] Create Document technical solution
+   7   ADL-1700  In Progress       Medium    [APU Health Monitor] Create query for APU Health Monit...
+   8   ADL-1684  To Do             Medium    [ Amos Training report ] - Create Staff PQS Qualificat...
+   9   ADL-1662  Ready for review  Medium    Create AOG and AOG updates VDS under fleet_mgmt foder...
+  10   ADL-1656  On hold           Medium    [MM Discrepancy Report] Payload Missing 
+  11   ADL-1589  Ready for prod    Medium    [Finance - Masters]   Create Foreign Exchange Master V...
+  12   ADL-1588  Ready for prod    Medium    [Finance Dashboard - Prod Issue]  FX calculation logic...
+  13   ADL-1585  Ready for prod    Medium    [Finance] - Opening and Closing Balance Mismatch for B...
+  14   ADL-1576  Ready for prod    Medium    [Finance P&L- Document Currency] Document currency val...
+  15   ADL-1525  On hold           Medium    [AMOS Upgrade] All dashboards should be running as it...
+  16   ADL-902   On hold           Medium    [Eagle Eye] Reflection for technical delay is working...
+   0   Back
+==============================================================
+  Select ticket number: INFO:     127.0.0.1:50958 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51375 - "GET / HTTP/1.1" 200 OK
+UI disconnected.
+UI disconnected.
+INFO:     connection closed
+INFO:     connection closed
+INFO:     127.0.0.1:51472 - "WebSocket /ws" [accepted]
+INFO:     connection open
+INFO:     127.0.0.1:51475 - "WebSocket /ws" [accepted]
+INFO:     connection open
+
+==============================================================
+  SELECT PROJECT
+==============================================================
+  Loading projects ...
+  [1] ADL        ASL Data Lake   (default)
+  [2] ASL        ASL Integration Framework
+  [3] PSUD       Process Set up Dummy 
+  [0] Cancel
+==============================================================
+  Select project number (Enter for ADL): INFO:     127.0.0.1:51376 - "GET / HTTP/1.1" 200 OK
+UI disconnected.
+UI disconnected.
+INFO:     connection closed
+INFO:     connection closed
+INFO:     127.0.0.1:51376 - "GET /image/asl_airlines_edited.mp4 HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:51690 - "WebSocket /ws" [accepted]
+INFO:     connection open
+INFO:     127.0.0.1:51695 - "WebSocket /ws" [accepted]
+INFO:     connection open
+
+==============================================================
+  SELECT PROJECT
+==============================================================
+  Loading projects ...
+INFO:     127.0.0.1:51376 - "GET /image/asl_airlines_edited.mp4 HTTP/1.1" 206 Partial Content
+  [1] ADL        ASL Data Lake   (default)
+  [2] ASL        ASL Integration Framework
+  [3] PSUD       Process Set up Dummy 
+  [0] Cancel
+==============================================================
+  Select project number (Enter for ADL): 1
+
+  Project set to ADL  (board id 2).
+
+==============================================================
+  ASL AIRLINES  --  ADL WORKFLOW  |  JIRA -> DOC -> DREMIO -> QLIK
+==============================================================
+  [1]  Work on an existing ticket  (browse sprint)
+  [2]  Browse backlog tickets
+  [3]  Create a new ticket
+  [4]  GitHub version control assistant
+  [0]  Exit
+==============================================================
+  Select option: INFO:     127.0.0.1:53881 - "GET /image/asl_airlines_edited.mp4 HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:59284 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61789 - "GET / HTTP/1.1" 200 OK
+UI disconnected.
+UI disconnected.
+INFO:     connection closed
+INFO:     connection closed
+INFO:     127.0.0.1:61829 - "WebSocket /ws" [accepted]
+INFO:     connection open
+INFO:     127.0.0.1:61831 - "WebSocket /ws" [accepted]
+INFO:     connection open
+INFO:     127.0.0.1:61789 - "GET / HTTP/1.1" 200 OK
+UI disconnected.
+INFO:     connection closed
+UI disconnected.
+INFO:     connection closed
+INFO:     127.0.0.1:61936 - "WebSocket /ws" [accepted]
+INFO:     connection open
+INFO:     127.0.0.1:61939 - "WebSocket /ws" [accepted]
+INFO:     connection open
+
+==============================================================
+  SELECT PROJECT
+==============================================================
+  Loading projects ...
+  [1] ADL        ASL Data Lake   (default)
+  [2] ASL        ASL Integration Framework
+  [3] PSUD       Process Set up Dummy 
+  [0] Cancel
+==============================================================
+  Select project number (Enter for ADL): INFO:     127.0.0.1:61791 - "GET / HTTP/1.1" 200 OK
+UI disconnected.
+UI disconnected.
+INFO:     connection closed
+INFO:     connection closed
+INFO:     127.0.0.1:62285 - "WebSocket /ws" [accepted]
+INFO:     connection open
+INFO:     127.0.0.1:62290 - "WebSocket /ws" [accepted]
+INFO:     connection open
+
+==============================================================
+  SELECT PROJECT
+==============================================================
+  Loading projects ...
+  [1] ADL        ASL Data Lake   (default)
+  [2] ASL        ASL Integration Framework
+  [3] PSUD       Process Set up Dummy 
+  [0] Cancel
+==============================================================
+  Select project number (Enter for ADL): 1
+
+  Project set to ADL  (board id 2).
+
+==============================================================
+  ASL AIRLINES  --  ADL WORKFLOW  |  JIRA -> DOC -> DREMIO -> QLIK
+==============================================================
+  [1]  Work on an existing ticket  (browse sprint)
+  [2]  Browse backlog tickets
+  [3]  Create a new ticket
+  [4]  GitHub version control assistant
+  [0]  Exit
+==============================================================
+INFO:     127.0.0.1:53019 - "WebSocket /ws" [accepted]
+INFO:     connection open
+  Select option: 
+==============================================================
+  SELECT PROJECT
+==============================================================
+  Loading projects ...
+  [1] ADL        ASL Data Lake   (default)
+  [2] ASL        ASL Integration Framework
+  [3] PSUD       Process Set up Dummy 
+  [0] Cancel
+==============================================================
+  Select project number (Enter for ADL): UI disconnected.
+INFO:     connection closed
+INFO:     127.0.0.1:53136 - "WebSocket /ws" [accepted]
+INFO:     connection open
+
+==============================================================
+  SELECT PROJECT
+==============================================================
+  Loading projects ...
+  [1] ADL        ASL Data Lake   (default)
+  [2] ASL        ASL Integration Framework
+  [3] PSUD       Process Set up Dummy 
+  [0] Cancel
+==============================================================
+  Select project number (Enter for ADL): 1
+
+  Project set to ADL  (board id 2).
+
+==============================================================
+  ASL AIRLINES  --  ADL WORKFLOW  |  JIRA -> DOC -> DREMIO -> QLIK
+==============================================================
+  [1]  Work on an existing ticket  (browse sprint)
+  [2]  Browse backlog tickets
+  [3]  Create a new ticket
+  [4]  GitHub version control assistant
+  [0]  Exit
+==============================================================
+  Select option: 1
+
+  Loading sprints ... done
+
+==============================================================
+  SELECT SPRINT
+==============================================================
+  -- Active Sprint --
+  [ 1]  ADL Sprint 48  [ACTIVE]  <-- default
+
+  -- Recent Closed Sprints --
+  [ 2]  ADL Sprint 47  [CLOSED]
+  [ 3]  ADL Sprint 46  [CLOSED]
+  [ 4]  ADL Sprint 45  [CLOSED]
+  [ 5]  ADL Sprint 44  [CLOSED]
+  [ 6]  ADL Sprint 43  [CLOSED]
+  [ 7]  ADL Sprint 42  [CLOSED]
+  [ 8]  ADL Sprint 41  [CLOSED]
+  [ 9]  ADL Sprint 40  [CLOSED]
+  [10]  ADL Sprint 39  [CLOSED]
+  [11]  ADL Sprint 38  [CLOSED]
+  [ 0]  Back
+==============================================================
+  Select sprint number: 1
+
+  Selected: ADL Sprint 48  [ACTIVE]
+
+  Fetching tickets for ADL Sprint 48 ... done  (133 tickets found)
+
+==============================================================
+  ASSIGNEES  --  ADL Sprint 48
+==============================================================
+  [ 1]  Dhruv Mevada  (5 tickets)
+  [ 2]  Fenil Jain  (1 ticket)
+  [ 3]  Harini Reddy Godhala  (1 ticket)
+  [ 4]  Harsh Sanghvi  (11 tickets)
+  [ 5]  Isha Metange  (37 tickets)
+  [ 6]  Marmik Patel  (12 tickets)
+  [ 7]  Parthesh  (24 tickets)
+  [ 8]  Rashmi Pathak  (22 tickets)
+  [ 9]  Suhas Shete  (16 tickets)
+  [10]  Unassigned  (2 tickets)
+  [11]  dhaval.dangi  (1 ticket)
+  [12]  kamal prakash  (1 ticket)
+  [ 0]  Back
+==============================================================
+  Select assignee number: UI disconnected.
+INFO:     connection closed
+INFO:     127.0.0.1:58995 - "GET / HTTP/1.1" 200 OK
+UI disconnected.
+UI disconnected.
+INFO:     connection closed
+INFO:     connection closed
+INFO:     127.0.0.1:59033 - "WebSocket /ws" [accepted]
+INFO:     connection open
+
+==============================================================
+  SELECT PROJECT
+==============================================================
+  Loading projects ...
+  [1] ADL        ASL Data Lake   (default)
+  [2] ASL        ASL Integration Framework
+  [3] PSUD       Process Set up Dummy 
+  [0] Cancel
+==============================================================
+  Select project number (Enter for ADL): INFO:     127.0.0.1:58996 - "GET / HTTP/1.1" 200 OK
+UI disconnected.
+INFO:     connection closed
+INFO:     127.0.0.1:59274 - "WebSocket /ws" [accepted]
+INFO:     connection open
+
+==============================================================
+  SELECT PROJECT
+==============================================================
+  Loading projects ...
+  [1] ADL        ASL Data Lake   (default)
+  [2] ASL        ASL Integration Framework
+  [3] PSUD       Process Set up Dummy 
+  [0] Cancel
+==============================================================
+  Select project number (Enter for ADL): 1
+
+  Project set to ADL  (board id 2).
+
+==============================================================
+  ASL AIRLINES  --  ADL WORKFLOW  |  JIRA -> DOC -> DREMIO -> QLIK
+==============================================================
+  [1]  Work on an existing ticket  (browse sprint)
+  [2]  Browse backlog tickets
+  [3]  Create a new ticket
+  [4]  GitHub version control assistant
+  [0]  Exit
+==============================================================
+  Select option: 1
+
+  Loading sprints ... done
+
+==============================================================
+  SELECT SPRINT
+==============================================================
+  -- Active Sprint --
+  [ 1]  ADL Sprint 48  [ACTIVE]  <-- default
+
+  -- Recent Closed Sprints --
+  [ 2]  ADL Sprint 47  [CLOSED]
+  [ 3]  ADL Sprint 46  [CLOSED]
+  [ 4]  ADL Sprint 45  [CLOSED]
+  [ 5]  ADL Sprint 44  [CLOSED]
+  [ 6]  ADL Sprint 43  [CLOSED]
+  [ 7]  ADL Sprint 42  [CLOSED]
+  [ 8]  ADL Sprint 41  [CLOSED]
+  [ 9]  ADL Sprint 40  [CLOSED]
+  [10]  ADL Sprint 39  [CLOSED]
+  [11]  ADL Sprint 38  [CLOSED]
+  [ 0]  Back
+==============================================================
+  Select sprint number: 1
+
+  Selected: ADL Sprint 48  [ACTIVE]
+
+  Fetching tickets for ADL Sprint 48 ... done  (133 tickets found)
+
+==============================================================
+  ASSIGNEES  --  ADL Sprint 48
+==============================================================
+  [ 1]  Dhruv Mevada  (5 tickets)
+  [ 2]  Fenil Jain  (1 ticket)
+  [ 3]  Harini Reddy Godhala  (1 ticket)
+  [ 4]  Harsh Sanghvi  (11 tickets)
+  [ 5]  Isha Metange  (37 tickets)
+  [ 6]  Marmik Patel  (12 tickets)
+  [ 7]  Parthesh  (24 tickets)
+  [ 8]  Rashmi Pathak  (22 tickets)
+  [ 9]  Suhas Shete  (16 tickets)
+  [10]  Unassigned  (2 tickets)
+  [11]  dhaval.dangi  (1 ticket)
+  [12]  kamal prakash  (1 ticket)
+  [ 0]  Back
+==============================================================
+  Select assignee number: 9
+
+==============================================================
+  TICKETS  --  Suhas Shete
+==============================================================
+   #   Key       Status            Priority  Summary
+  --   --------- ----------------- --------- ---------------------------------------------
+   1   ADL-1724  In Progress       Medium    [Incomplete Material Picking]  Add more fields to the...
+   2   ADL-1721  Ready for review  Medium    Create Production Document for Training Status Report
+   3   ADL-1718  To Do             Medium    [Movement Manager] Python script has been failing at m...
+   4   ADL-1716  Ready for review  Medium    [ Finance ] - Move all the Tally VDS from Dev folder t...
+   5   ADL-1703  Ready for review  Medium    SAP Data Catalog
+   6   ADL-1701  In Progress       Medium    [APU Health Monitor] Create Document technical solution
+   7   ADL-1700  In Progress       Medium    [APU Health Monitor] Create query for APU Health Monit...
+   8   ADL-1684  To Do             Medium    [ Amos Training report ] - Create Staff PQS Qualificat...
+   9   ADL-1662  Ready for review  Medium    Create AOG and AOG updates VDS under fleet_mgmt foder...
+  10   ADL-1656  On hold           Medium    [MM Discrepancy Report] Payload Missing 
+  11   ADL-1589  Ready for prod    Medium    [Finance - Masters]   Create Foreign Exchange Master V...
+  12   ADL-1588  Ready for prod    Medium    [Finance Dashboard - Prod Issue]  FX calculation logic...
+  13   ADL-1585  Ready for prod    Medium    [Finance] - Opening and Closing Balance Mismatch for B...
+  14   ADL-1576  Ready for prod    Medium    [Finance P&L- Document Currency] Document currency val...
+  15   ADL-1525  On hold           Medium    [AMOS Upgrade] All dashboards should be running as it...
+  16   ADL-902   On hold           Medium    [Eagle Eye] Reflection for technical delay is working...
+   0   Back
+==============================================================
+  Select ticket number: 7
+
+==============================================================
+  SELECTED TICKET : ADL-1700
+==============================================================
+  Sprint   : ADL Sprint 48  [ACTIVE]
+  Summary  : [APU Health Monitor] Create query for APU Health Monitor in Engine Folder
+  State    : In Progress
+  Priority : Medium
+  Assignee : Suhas Shete
+==============================================================
+
+  Fetching full ticket details ... done
+
+  Jira Agent analyzing ticket ... done
+
+==============================================================
+  TICKET REQUIREMENTS  (extracted by Jira Agent)
+==============================================================
+  Ticket  : ADL-1700
+  Summary : [APU Health Monitor] Create query for APU Health Monitor in Engine Folder
+
+  Business Requirement:
+    Create a query for APU Health Monitor that extracts APU performance data from AMOS for APUs fitted to ASL AC Type B737NG aircraft. The query will join rotables and rotables_trend tables to provide APU part numbers, serial numbers, PSN identifiers, aircraft registration, reference dates, trend types (CT5), workorder information, and CT5ATP values, filtered to the latest reference date for each APU and B737NG aircraft type only.
+
+  Source Database : amos_acceptance
+  Source Tables (3):
+    - amos.rotables
+    - amos.rotables_trend
+    - amos.aircraft
+
+  Output Fields (9):
+    - partno: APU Part Number
+    - serialno: APU Serial Number
+    - psn: Unique PSN associated with each APU Serial Number
+    - ac_registr: Aircraft Registration
+    - ref_date: Reference Date - latest date only for each APU
+    - trend_type: Trend Type - CT5
+    - event_perfno_i: Workorder if present
+    - value: CT5ATP value
+    - ac_typ: Aircraft Type
+
+  Transformations (4):
+    - Join rotables table to rotables_trend table on psn field
+    - Join rotables table to aircraft table on ac_registr field
+    - Filter rotables_trend to only the latest ref_date for each unique PSN
+    - Filter trend_type to only CT5 records
+
+  Filters (3):
+    - aircraft.ac_typ = 'B737NG'
+    - rotables_trend.trend_type = 'CT5'
+    - rotables_trend.ref_date = (SELECT MAX(ref_date) FROM rotables_trend rt2 WHERE rt2.psn = rotables_trend.psn)
+
+  Acceptance Criteria (7):
+    - Query returns only APUs fitted to B737NG aircraft type
+    - Only the latest reference date is included for each APU PSN
+    - All required fields from rotables, rotables_trend, and aircraft tables are present in output
+    - CT5ATP values are correctly populated from rotables_trend.value column
+    - Workorder information is included when present in event_perfno_i field
+    - VDS is created in Engine Folder in Dremio
+    - Query executes successfully against AMOS Acceptance database
+==============================================================
+  Proceed to Documentation + Dremio Agent? [y/n]: y
+
+==============================================================
+  DOCUMENTATION AGENT  �  Technical Implementation Document
+==============================================================
+  Generating Technical Implementation Document from ticket requirements ...
+  (This calls the configured LLM � may take 15�30 seconds)
+
+
+  Document saved: E:\LLM\Claude\Project Documentation\ADL-1700_20260606_224329.docx
+  Open it in Word for review and sign-off.
+
+  Proceed to Dremio Agent? [y/n]: INFO:     127.0.0.1:64953 - "GET / HTTP/1.1" 200 OK
+UI disconnected.
+INFO:     connection closed
+INFO:     127.0.0.1:65000 - "WebSocket /ws" [accepted]
+INFO:     connection open
+
+==============================================================
+  SELECT PROJECT
+==============================================================
+  Loading projects ...
+INFO:     127.0.0.1:64954 - "GET / HTTP/1.1" 200 OK
+UI disconnected.
+INFO:     connection closed
+  [1] ADL        ASL Data Lake   (default)
+  [2] ASL        ASL Integration Framework
+  [3] PSUD       Process Set up Dummy 
+  [0] Cancel
+==============================================================
+INFO:     127.0.0.1:65105 - "WebSocket /ws" [accepted]
+INFO:     connection open
+  Select project number (Enter for ADL): 
+==============================================================
+  SELECT PROJECT
+==============================================================
+  Loading projects ...
+  [1] ADL        ASL Data Lake   (default)
+  [2] ASL        ASL Integration Framework
+  [3] PSUD       Process Set up Dummy 
+  [0] Cancel
+==============================================================
+  Select project number (Enter for ADL): 1
+
+  Project set to ADL  (board id 2).
+
+==============================================================
+  ASL AIRLINES  --  ADL WORKFLOW  |  JIRA -> DOC -> DREMIO -> QLIK
+==============================================================
+  [1]  Work on an existing ticket  (browse sprint)
+  [2]  Browse backlog tickets
+  [3]  Create a new ticket
+  [4]  GitHub version control assistant
+  [0]  Exit
+==============================================================
+  Select option: 1
+
+  Loading sprints ... done
+
+==============================================================
+  SELECT SPRINT
+==============================================================
+  -- Active Sprint --
+  [ 1]  ADL Sprint 48  [ACTIVE]  <-- default
+
+  -- Recent Closed Sprints --
+  [ 2]  ADL Sprint 47  [CLOSED]
+  [ 3]  ADL Sprint 46  [CLOSED]
+  [ 4]  ADL Sprint 45  [CLOSED]
+  [ 5]  ADL Sprint 44  [CLOSED]
+  [ 6]  ADL Sprint 43  [CLOSED]
+  [ 7]  ADL Sprint 42  [CLOSED]
+  [ 8]  ADL Sprint 41  [CLOSED]
+  [ 9]  ADL Sprint 40  [CLOSED]
+  [10]  ADL Sprint 39  [CLOSED]
+  [11]  ADL Sprint 38  [CLOSED]
+  [ 0]  Back
+==============================================================
+  Select sprint number: 1
+
+  Selected: ADL Sprint 48  [ACTIVE]
+
+  Fetching tickets for ADL Sprint 48 ... done  (133 tickets found)
+
+==============================================================
+  ASSIGNEES  --  ADL Sprint 48
+==============================================================
+  [ 1]  Dhruv Mevada  (5 tickets)
+  [ 2]  Fenil Jain  (1 ticket)
+  [ 3]  Harini Reddy Godhala  (1 ticket)
+  [ 4]  Harsh Sanghvi  (11 tickets)
+  [ 5]  Isha Metange  (37 tickets)
+  [ 6]  Marmik Patel  (12 tickets)
+  [ 7]  Parthesh  (24 tickets)
+  [ 8]  Rashmi Pathak  (22 tickets)
+  [ 9]  Suhas Shete  (16 tickets)
+  [10]  Unassigned  (2 tickets)
+  [11]  dhaval.dangi  (1 ticket)
+  [12]  kamal prakash  (1 ticket)
+  [ 0]  Back
+==============================================================
+  Select assignee number: 9
+
+==============================================================
+  TICKETS  --  Suhas Shete
+==============================================================
+   #   Key       Status            Priority  Summary
+  --   --------- ----------------- --------- ---------------------------------------------
+   1   ADL-1724  In Progress       Medium    [Incomplete Material Picking]  Add more fields to the...
+   2   ADL-1721  Ready for review  Medium    Create Production Document for Training Status Report
+   3   ADL-1718  To Do             Medium    [Movement Manager] Python script has been failing at m...
+   4   ADL-1716  Ready for review  Medium    [ Finance ] - Move all the Tally VDS from Dev folder t...
+   5   ADL-1703  Ready for review  Medium    SAP Data Catalog
+   6   ADL-1701  In Progress       Medium    [APU Health Monitor] Create Document technical solution
+   7   ADL-1700  In Progress       Medium    [APU Health Monitor] Create query for APU Health Monit...
+   8   ADL-1684  To Do             Medium    [ Amos Training report ] - Create Staff PQS Qualificat...
+   9   ADL-1662  Ready for review  Medium    Create AOG and AOG updates VDS under fleet_mgmt foder...
+  10   ADL-1656  On hold           Medium    [MM Discrepancy Report] Payload Missing 
+  11   ADL-1589  Ready for prod    Medium    [Finance - Masters]   Create Foreign Exchange Master V...
+  12   ADL-1588  Ready for prod    Medium    [Finance Dashboard - Prod Issue]  FX calculation logic...
+  13   ADL-1585  Ready for prod    Medium    [Finance] - Opening and Closing Balance Mismatch for B...
+  14   ADL-1576  Ready for prod    Medium    [Finance P&L- Document Currency] Document currency val...
+  15   ADL-1525  On hold           Medium    [AMOS Upgrade] All dashboards should be running as it...
+  16   ADL-902   On hold           Medium    [Eagle Eye] Reflection for technical delay is working...
+   0   Back
+==============================================================
+  Select ticket number: 7
+
+==============================================================
+  SELECTED TICKET : ADL-1700
+==============================================================
+  Sprint   : ADL Sprint 48  [ACTIVE]
+  Summary  : [APU Health Monitor] Create query for APU Health Monitor in Engine Folder
+  State    : In Progress
+  Priority : Medium
+  Assignee : Suhas Shete
+==============================================================
+
+  Fetching full ticket details ... done
+
+  Jira Agent analyzing ticket ... done
+
+==============================================================
+  TICKET REQUIREMENTS  (extracted by Jira Agent)
+==============================================================
+  Ticket  : ADL-1700
+  Summary : [APU Health Monitor] Create query for APU Health Monitor in Engine Folder
+
+  Business Requirement:
+    Create a query for APU Health Monitor that retrieves APU performance data from AMOS for APUs fitted to ASL AC Type B737NG aircraft. The query should join rotables and rotables_trend tables to provide APU part numbers, serial numbers, PSN identifiers, aircraft registration, reference dates, trend types (CT5), workorder information, and CT5ATP values, filtered to the latest reference date for each APU and B737NG aircraft type only.
+
+  Source Database : amos_acceptance
+  Source Tables (3):
+    - amos.rotables
+    - amos.rotables_trend
+    - amos.aircraft
+
+  Output Fields (9):
+    - partno: APU Part Number
+    - serialno: APU Serial Number
+    - psn: Unique PSN associated with each APU Serial Number
+    - ac_registr: Aircraft Registration
+    - ref_date: Reference Date (latest date only for each APU)
+    - trend_type: Trend Type (CT5)
+    - event_perfno_i: Workorder (if present)
+    - value: CT5ATP value
+    - ac_typ: Aircraft Type
+
+  Transformations (4):
+    - Join rotables table with rotables_trend table on psn field
+    - Join result with aircraft table on ac_registr field to filter by aircraft type
+    - Filter rotables_trend records to include only the latest ref_date for each unique PSN
+    - Filter trend_type to only CT5 records
+
+  Filters (3):
+    - aircraft.ac_typ = 'B737NG'
+    - rotables_trend.trend_type = 'CT5'
+    - rotables_trend.ref_date = (SELECT MAX(ref_date) FROM rotables_trend rt2 WHERE rt2.psn = rotables_trend.psn)
+
+  Acceptance Criteria (6):
+    - Query returns all APUs fitted to B737NG aircraft type only
+    - Only the latest reference date is included for each APU PSN
+    - All required fields are present in output: APU P/n, APU S/n, PSN, Aircraft Reg., Reference Date, CT5, Workorder, and CT5ATP value
+    - VDS is created in Engine Folder
+    - Query executes against AMOS Acceptance environment initially, with migration path to AMOS Production upon go-live
+    - Workorder field handles NULL values appropriately when not present
+==============================================================
+  Proceed to Documentation + Dremio Agent? [y/n]: INFO:     127.0.0.1:53514 - "GET / HTTP/1.1" 200 OK
+UI disconnected.
+INFO:     connection closed
+INFO:     127.0.0.1:53577 - "WebSocket /ws" [accepted]
+INFO:     connection open
+INFO:     127.0.0.1:53514 - "GET / HTTP/1.1" 200 OK
+UI disconnected.
+INFO:     connection closed
+INFO:     127.0.0.1:53669 - "WebSocket /ws" [accepted]
+INFO:     connection open
+
+==============================================================
+  SELECT PROJECT
+==============================================================
+  Loading projects ...
+INFO:     127.0.0.1:53515 - "GET / HTTP/1.1" 200 OK
+UI disconnected.
+INFO:     connection closed
+  [1] ADL        ASL Data Lake   (default)
+  [2] ASL        ASL Integration Framework
+  [3] PSUD       Process Set up Dummy 
+  [0] Cancel
+==============================================================
+INFO:     127.0.0.1:53809 - "WebSocket /ws" [accepted]
+INFO:     connection open
+  Select project number (Enter for ADL): 
+==============================================================
+  SELECT PROJECT
+==============================================================
+  Loading projects ...
+  [1] ADL        ASL Data Lake   (default)
+  [2] ASL        ASL Integration Framework
+  [3] PSUD       Process Set up Dummy 
+  [0] Cancel
+==============================================================
+  Select project number (Enter for ADL): 1
+
+  Project set to ADL  (board id 2).
+
+==============================================================
+  ASL AIRLINES  --  ADL WORKFLOW  |  JIRA -> DOC -> DREMIO -> QLIK
+==============================================================
+  [1]  Work on an existing ticket  (browse sprint)
+  [2]  Browse backlog tickets
+  [3]  Create a new ticket
+  [4]  GitHub version control assistant
+  [0]  Exit
+==============================================================
+  Select option: 1
+
+2026-06-07 04:20:04,068  WARNING   adl_automated_delivery_pipeline.workflows.adl_automated_delivery_pipeline - Could not load sprints: HTTPSConnectionPool(host='aslairlines.atlassian.net', port=443): Max retries exceeded with url: /rest/api/2/serverInfo (Caused by ConnectTimeoutError(<HTTPSConnection(host='aslairlines.atlassian.net', port=443) at 0x1e8129e9a90>, 'Connection to aslairlines.atlassian.net timed out. (connect timeout=10)'))
+  Loading sprints ... done
+  Could not load sprints.
+  Cancelled.
+INFO:     127.0.0.1:61322 - "GET / HTTP/1.1" 200 OK
+UI disconnected.
+INFO:     connection closed
+INFO:     127.0.0.1:61367 - "WebSocket /ws" [accepted]
+INFO:     connection open
+
+==============================================================
+  SELECT PROJECT
+==============================================================
+  Loading projects ...
+  [1] ADL        ASL Data Lake   (default)
+  [2] ASL        ASL Integration Framework
+  [3] PSUD       Process Set up Dummy 
+  [0] Cancel
+==============================================================
+  Select project number (Enter for ADL): 1
+
+  Project set to ADL  (board id 2).
+
+==============================================================
+  ASL AIRLINES  --  ADL WORKFLOW  |  JIRA -> DOC -> DREMIO -> QLIK
+==============================================================
+  [1]  Work on an existing ticket  (browse sprint)
+  [2]  Browse backlog tickets
+  [3]  Create a new ticket
+  [4]  GitHub version control assistant
+  [0]  Exit
+==============================================================
+  Select option: 1
+
+  Loading sprints ... done
+
+==============================================================
+  SELECT SPRINT
+==============================================================
+  -- Active Sprint --
+  [ 1]  ADL Sprint 48  [ACTIVE]  <-- default
+
+  -- Recent Closed Sprints --
+  [ 2]  ADL Sprint 47  [CLOSED]
+  [ 3]  ADL Sprint 46  [CLOSED]
+  [ 4]  ADL Sprint 45  [CLOSED]
+  [ 5]  ADL Sprint 44  [CLOSED]
+  [ 6]  ADL Sprint 43  [CLOSED]
+  [ 7]  ADL Sprint 42  [CLOSED]
+  [ 8]  ADL Sprint 41  [CLOSED]
+  [ 9]  ADL Sprint 40  [CLOSED]
+  [10]  ADL Sprint 39  [CLOSED]
+  [11]  ADL Sprint 38  [CLOSED]
+  [ 0]  Back
+==============================================================
+  Select sprint number: 1
+
+  Selected: ADL Sprint 48  [ACTIVE]
+
+  Fetching tickets for ADL Sprint 48 ... done  (133 tickets found)
+
+==============================================================
+  ASSIGNEES  --  ADL Sprint 48
+==============================================================
+  [ 1]  Dhruv Mevada  (5 tickets)
+  [ 2]  Fenil Jain  (1 ticket)
+  [ 3]  Harini Reddy Godhala  (1 ticket)
+  [ 4]  Harsh Sanghvi  (11 tickets)
+  [ 5]  Isha Metange  (37 tickets)
+  [ 6]  Marmik Patel  (12 tickets)
+  [ 7]  Parthesh  (24 tickets)
+  [ 8]  Rashmi Pathak  (22 tickets)
+  [ 9]  Suhas Shete  (16 tickets)
+  [10]  Unassigned  (2 tickets)
+  [11]  dhaval.dangi  (1 ticket)
+  [12]  kamal prakash  (1 ticket)
+  [ 0]  Back
+==============================================================
+  Select assignee number: 9
+
+==============================================================
+  TICKETS  --  Suhas Shete
+==============================================================
+   #   Key       Status            Priority  Summary
+  --   --------- ----------------- --------- ---------------------------------------------
+   1   ADL-1724  In Progress       Medium    [Incomplete Material Picking]  Add more fields to the...
+   2   ADL-1721  Ready for review  Medium    Create Production Document for Training Status Report
+   3   ADL-1718  To Do             Medium    [Movement Manager] Python script has been failing at m...
+   4   ADL-1716  Ready for review  Medium    [ Finance ] - Move all the Tally VDS from Dev folder t...
+   5   ADL-1703  Ready for review  Medium    SAP Data Catalog
+   6   ADL-1701  In Progress       Medium    [APU Health Monitor] Create Document technical solution
+   7   ADL-1700  In Progress       Medium    [APU Health Monitor] Create query for APU Health Monit...
+   8   ADL-1684  To Do             Medium    [ Amos Training report ] - Create Staff PQS Qualificat...
+   9   ADL-1662  Ready for review  Medium    Create AOG and AOG updates VDS under fleet_mgmt foder...
+  10   ADL-1656  On hold           Medium    [MM Discrepancy Report] Payload Missing 
+  11   ADL-1589  Ready for prod    Medium    [Finance - Masters]   Create Foreign Exchange Master V...
+  12   ADL-1588  Ready for prod    Medium    [Finance Dashboard - Prod Issue]  FX calculation logic...
+  13   ADL-1585  Ready for prod    Medium    [Finance] - Opening and Closing Balance Mismatch for B...
+  14   ADL-1576  Ready for prod    Medium    [Finance P&L- Document Currency] Document currency val...
+  15   ADL-1525  On hold           Medium    [AMOS Upgrade] All dashboards should be running as it...
+  16   ADL-902   On hold           Medium    [Eagle Eye] Reflection for technical delay is working...
+   0   Back
+==============================================================
+  Select ticket number: 7
+
+==============================================================
+  SELECTED TICKET : ADL-1700
+==============================================================
+  Sprint   : ADL Sprint 48  [ACTIVE]
+  Summary  : [APU Health Monitor] Create query for APU Health Monitor in Engine Folder
+  State    : In Progress
+  Priority : Medium
+  Assignee : Suhas Shete
+==============================================================
+
+  Fetching full ticket details ... done
+
+  Jira Agent analyzing ticket ... done
+
+==============================================================
+  TICKET REQUIREMENTS  (extracted by Jira Agent)
+==============================================================
+  Ticket  : ADL-1700
+  Summary : [APU Health Monitor] Create query for APU Health Monitor in Engine Folder
+
+  Business Requirement:
+    Create a query for APU Health Monitor that retrieves APU performance data from AMOS for APUs fitted to ASL AC Type B737NG aircraft. The query will join rotables and rotables_trend tables to provide APU part numbers, serial numbers, PSN identifiers, aircraft registration, reference dates, CT5 trend types, workorder information, and CT5ATP values, filtered to the latest reference date for each APU and B737NG aircraft type only.
+
+  Source Database : amos_acceptance
+  Source Tables (3):
+    - amos.rotables
+    - amos.rotables_trend
+    - amos.aircraft
+
+  Output Fields (9):
+    - partno: APU Part Number
+    - serialno: APU Serial Number
+    - psn: Unique PSN associated with each APU Serial Number
+    - ac_registr: Aircraft Registration
+    - ref_date: Reference Date (latest date only for each APU)
+    - trend_type: CT5 trend type indicator
+    - event_perfno_i: Workorder number if present
+    - value: CT5ATP value representing APU health metric
+    - ac_typ: Aircraft type
+
+  Transformations (4):
+    - Join rotables table with rotables_trend table on psn field
+    - Join result with aircraft table on ac_registr field to retrieve aircraft type
+    - Filter rotables_trend to include only the latest ref_date for each unique PSN
+    - Retain trend_type value of CT5 for all records
+
+  Filters (3):
+    - aircraft.ac_typ = 'B737NG'
+    - rotables_trend.trend_type = 'CT5'
+    - rotables_trend.ref_date is the maximum ref_date for each PSN
+
+  Acceptance Criteria (7):
+    - Query returns all APUs of type B737NG with their latest CT5ATP health metrics
+    - Each APU appears only once with its most recent reference date
+    - All required fields (partno, serialno, psn, ac_registr, ref_date, trend_type, event_perfno_i, value, ac_typ) are populated in output
+    - Workorder field (event_perfno_i) displays value if present, otherwise null
+    - VDS is created in Engine Folder
+    - Query executes successfully against AMOS Acceptance environment
+    - Upon AMOS production go-live, data source can be switched to production without query logic changes
+==============================================================
+  Proceed to Documentation + Dremio Agent? [y/n]: y
+
+==============================================================
+  DOCUMENTATION AGENT  �  Technical Implementation Document
+==============================================================
+  Generating Technical Implementation Document from ticket requirements ...
+  (This calls the configured LLM � may take 15�30 seconds)
+
+
+  Document saved: E:\LLM\Claude\Project Documentation\ADL-1700_20260606_225147.docx
+  Open it in Word for review and sign-off.
+
+  Proceed to Dremio Agent? [y/n]: y
+  Cooling down 5s to reset API rate limit window ... ready.
+
+
+==============================================================
+  DREMIO AGENT  --  Select Operation
+==============================================================
+  [1] Generate VDS query from ticket requirements  (recommended)
+  [2] Preview existing table or view
+  [3] Browse catalog folder / list views
+  [4] Execute a SQL query
+  [5] Validate SQL
+  [6] Create Virtual Dataset (provide SQL manually)
+  [7] Update existing VDS
+  [8] Free-text query (ask the Dremio Agent anything)
+  [0] Exit Dremio Agent
+==============================================================
+  Select option: 1
+
+  Generating SQL (attempt 1) ...
+  [auto-fix] Dremio SQL generation � applying fix and saving to memory ...
+  [memory] error + fix saved for future runs.
+
+==============================================================
+  GENERATED SQL  (attempt 1  |  ADL-1700)
+==============================================================
+
+-- VDS: APU Health Monitor
+-- Description: APU performance data for B737NG aircraft with latest CT5 trend metrics
+-- Source: amos_postgres.amos (AMOS Acceptance)
+-- Owner: Engine Folder
+-- Ticket: ADL-1700
+
+SELECT
+    r.partno,
+    r.serialno,
+    r.psn,
+    r.ac_registr,
+    DATE_ADD(DATE '1971-12-31', CAST(rt.ref_date AS BIGINT)) AS ref_date,
+    rt.trend_type,
+    rt.event_perfno_i,
+    rt."value",
+    a.ac_typ
+FROM amos_postgres.amos.rotables r
+INNER JOIN amos_postgres.amos.rotables_trend rt
+    ON r.psn = rt.psn
+INNER JOIN amos_postgres.amos.aircraft a
+    ON UPPER(r.ac_registr) = UPPER(a.ac_registr)
+WHERE UPPER(a.ac_typ) = UPPER('B737NG')
+    AND UPPER(rt.trend_type) = UPPER('CT5')
+    AND rt.ref_date = (
+        SELECT MAX(rt2.ref_date)
+        FROM amos_postgres.amos.rotables_trend rt2
+        WHERE rt2.psn = r.psn
+            AND UPPER(rt2.trend_type) = UPPER('CT5')
+    )
+
+==============================================================
+  [1] Approve and save to file
+  [2] Regenerate with feedback
+  [3] Discard and return to menu
+==============================================================
+  Select [1/2/3]: 1
+
+  SQL saved: E:\LLM\Claude\adl_automated_delivery_pipeline\generated_queries\ADL-1700_20260606_225221.sql
+
+  Create VDS in Dremio now? [y/n]: y
+
+==============================================================
+  CREATE VDS  �  Step 1: Choose folder in dremio-db
+==============================================================
+  Fetching existing folders under dremio-db ... done  (24 folders found)
+
+  Existing folders under dremio-db:
+  [ 1]  dremio-db.Dev
+  [ 2]  dremio-db.Self_Service
+  [ 3]  dremio-db.amos_business_continuity
+  [ 4]  dremio-db.amos_training_status_report
+  [ 5]  dremio-db.apu_health
+  [ 6]  dremio-db.bi_server
+  [ 7]  dremio-db.cezanne_emp_directory
+  [ 8]  dremio-db.climate_transition_plan
+  [ 9]  dremio-db.daily_fleet_status
+  [10]  dremio-db.document_status_change
+  [11]  dremio-db.eagle_eye
+  [12]  dremio-db.engine_fleet_status
+  [13]  dremio-db.finance
+  [14]  dremio-db.fleet_mgmt
+  [15]  dremio-db.hoc
+  [16]  dremio-db.if_team
+  [17]  dremio-db.incomplete_material_picking
+  [18]  dremio-db.intercompany
+  [19]  dremio-db.inventory
+  [20]  dremio-db.maintenance_forecast_alert
+  [21]  dremio-db.maintenance_reliability_report
+  [22]  dremio-db.maintenance_reserve
+  [23]  dremio-db.occ
+  [24]  dremio-db.source
+  [ 0]  Create a new folder under dremio-db
+  [ C]  Cancel
+==============================================================
+  Select folder: 5
+
+==============================================================
+  CREATE VDS  �  Step 2: Inside dremio-db.apu_health
+==============================================================
+  You are now inside: dremio-db.apu_health
+    Sub-folder name (leave blank to use this folder directly): 
+
+==============================================================
+  CREATE VDS  �  Step 3: Name the VDS in dremio-db.apu_health
+==============================================================
+  Current location : dremio-db.apu_health
+  Suggested VDS name (from ticket/SQL): APU Health Monitor
+
+    VDS name [APU Health Monitor]: apu_health
+
+  VDS will be saved as:
+    dremio-db.apu_health.apu_health
+  
+  Confirm? [y/n]: y
+
+  A VDS named apu_health already exists at dremio-db.apu_health.apu_health.
+    Do you want to [b]ackup, [d]elete, or [c]ancel? [b/d/c]: d
+  Deleting existing VDS...
+  Old VDS deleted.
+
+  Creating VDS at dremio-db.apu_health.apu_health ...
+  SQL validated OK. Creating VDS ...
+  VDS created successfully!
+  ID  : {"tableKey":["dremio-db","apu_health","apu_health"],"contentId":"39c8de88-8efc-48f8-b847-3330b788c116","versionContext":{"type":"BRANCH","value":"main"}}
+  Path: dremio-db.apu_health.apu_health
+
+  Build QlikSense dashboard from this VDS? [y/n]: y
+  Is there a separate JIRA ticket for Qlik? [y/n]: y
+
+  [1] Work on an existing Qlik ticket (browse sprint)
+  [2] Browse Qlik backlog tickets
+  [0] Cancel / use original ticket
+  Select option: 1
+
+  Loading sprints ... done
+
+==============================================================
+  SELECT SPRINT
+==============================================================
+  -- Active Sprint --
+  [ 1]  ADL Sprint 48  [ACTIVE]  <-- default
+
+  -- Recent Closed Sprints --
+  [ 2]  ADL Sprint 47  [CLOSED]
+  [ 3]  ADL Sprint 46  [CLOSED]
+  [ 4]  ADL Sprint 45  [CLOSED]
+  [ 5]  ADL Sprint 44  [CLOSED]
+  [ 6]  ADL Sprint 43  [CLOSED]
+  [ 7]  ADL Sprint 42  [CLOSED]
+  [ 8]  ADL Sprint 41  [CLOSED]
+  [ 9]  ADL Sprint 40  [CLOSED]
+  [10]  ADL Sprint 39  [CLOSED]
+  [11]  ADL Sprint 38  [CLOSED]
+  [ 0]  Back
+==============================================================
+  Select sprint number: 1
+
+  Selected: ADL Sprint 48  [ACTIVE]
+
+==============================================================
+  ASSIGNEES  --  ADL Sprint 48
+==============================================================
+  [ 1]  Dhruv Mevada  (5 tickets)
+  [ 2]  Fenil Jain  (1 ticket)
+  [ 3]  Harini Reddy Godhala  (1 ticket)
+  [ 4]  Harsh Sanghvi  (11 tickets)
+  [ 5]  Isha Metange  (37 tickets)
+  [ 6]  Marmik Patel  (12 tickets)
+  [ 7]  Parthesh  (24 tickets)
+  [ 8]  Rashmi Pathak  (22 tickets)
+  [ 9]  Suhas Shete  (16 tickets)
+  [10]  Unassigned  (2 tickets)
+  [11]  dhaval.dangi  (1 ticket)
+  [12]  kamal prakash  (1 ticket)
+  [ 0]  Back
+==============================================================
+  Select assignee number: 7
+
+==============================================================
+  TICKETS  --  Parthesh
+==============================================================
+   #   Key       Status            Priority  Summary
+  --   --------- ----------------- --------- ---------------------------------------------
+   1   ADL-1730  To Do             Medium    [Finance - Asset and finance detailed sheet] - assigne...
+   2   ADL-1727  To Do             Medium    [Finance Dashboard] Update Qlik dashboard to include a...
+   3   ADL-1726  To Do             Medium    [Finanace] Show Tally P&L and BS data in Finance Repor...
+   4   ADL-1720  To Do             Medium    [Finance Asset] - QLIK - Add posting item column in As...
+   5   ADL-1717  To Do             Medium    [Finance] Update the Qlik template CMBBS sheet for Sta...
+   6   ADL-1715  To Do             Medium    [Finance - Prod Issue] - Accounts with Statutory/CMB C...
+   7   ADL-1702  To Do             Medium    [APU Health Monitor] Implement automated report schedu...
+   8   ADL-1699  In Progress       Medium    [APU Health Monitor] Create APU Health Monitor dashboa...
+   9   ADL-1664  To Do             Medium    [Incomplete Material Picking]  Add more fields to the...
+  10   ADL-1645  Ready for prod    Medium    [MM Discrepancy Report] UAT feedbacks
+  11   ADL-1618  Ready for prod    Medium    [Finance Dashboard - Prod Defect] - Cost center dimens...
+  12   ADL-1614  Done              Medium    [AIMS MM Discrepancy - Production Issue]  Dashboard wa...
+  13   ADL-1602  Done              Medium    Transfer ownership to svc_analytics@aslairlines.com in...
+  14   ADL-1595  Done              Medium    Change the Current Qlik report Email setting to OAuth...
+  15   ADL-1593  Ready for prod    Medium    [Finance P&L Document Currency] Currency INR and SAR a...
+  16   ADL-1592  Ready for prod    Medium    [Finance P&L - Document Currency]  Header should get u...
+  17   ADL-1591  Ready for prod    Medium    [Finance Dashboard - Detailed Verison] Update existing...
+  18   ADL-1590  Ready for prod    Medium    [Finance - Masters]   Create Foreign Exchange Master S...
+  19   ADL-1586  Ready for prod    Medium    [Finance P&L - Document Currency]  Provide toggle for...
+  20   ADL-1579  On hold           Medium    [Finance] - Qlik Showing Extra Decimal Digits Compared...
+  21   ADL-1574  Done              Medium    [Finance Report - Detailed Version]  Add foreign excha...
+  22   ADL-1540  On hold           Medium    [R&D] feasibility check for fetching active directory...
+  23   ADL-1516  Done              Medium    [Finance Report - Detailed Version - Production Defect...
+  24   ADL-1140  To Do             Medium    [Finance P&L] - Incorrect Data Display when selecting...
+   0   Back
+==============================================================
+  Select ticket number: 8
+
+  Fetching full Qlik ticket details ... done
+
+  Jira Agent analyzing ticket ... done
+
+==============================================================
+  TICKET REQUIREMENTS  (extracted by Jira Agent)
+==============================================================
+  Ticket  : ADL-1699
+  Summary : [APU Health Monitor] Create APU Health Monitor dashboard in Engine Status Dashboard
+
+  Business Requirement:
+    Create a new APU Health Monitor sheet in the existing Engine Dashboard that displays APU performance data with 8 key columns including part number, serial number, PSN, aircraft registration, reference date, CT5, workorder, and CT5ATP value. The sheet must include conditional formatting rules applied to the CT5ATP value column to highlight data based on threshold values.
+
+  Source Database : amos_postgres
+  Source Tables (3):
+    - amos.apu_data
+    - amos.aircraft_registration
+    - amos.workorder
+
+  Output Fields (8):
+    - APU P/n: APU Part Number
+    - APU S/n: APU Serial Number
+    - PSN: Power Source Number
+    - Aircraft Registration: Aircraft registration identifier
+    - Reference Date: Date reference for the APU health data
+    - CT5: Compressor Temperature 5 reading
+    - Workorder: Associated workorder number
+    - CT5ATP value: CT5 Actual To Plan value for APU health monitoring
+
+  Transformations (2):
+    - Convert Reference Date to standard date format (YYYY-MM-DD)
+    - Calculate CT5ATP value as a numeric field for conditional formatting comparison
+
+  Acceptance Criteria (6):
+    - All 8 columns (APU P/n, APU S/n, PSN, Aircraft Registration, Reference Date, CT5, Workorder, CT5ATP value) are displayed in the APU Health Monitor sheet
+    - CT5ATP value column displays with no formatting when value is less than 630
+    - CT5ATP value column displays with Amber background color when value is equal to or greater than 630
+    - CT5ATP value column displays with Red background color when value is equal to or greater than 660
+    - Sheet is integrated into the existing Engine Dashboard
+    - Conditional formatting rules are applied dynamically based on CT5ATP values
+==============================================================
+
+==============================================================
+  QLIK AGENT  �  PRE-FLIGHT CHECK
+==============================================================
+  Fetching latest ticket data for ADL-1699 ... done
+
+  JIRA TICKET
+  Ticket ID     : ADL-1699
+  Summary       : [APU Health Monitor] Create APU Health Monitor dashboard in Engine Status Dashboard
+  Assignee      : Parthesh
+  Sprint        : ADL Sprint 48
+  Priority      : Medium
+  State         : In Progress
+
+  DREMIO VDS  (from Dremio Agent)
+  VDS Path      : dremio-db.apu_health.apu_health
+
+  OUTPUT FIELDS  (from Jira ticket � will become dashboard columns)
+    - APU P/n              APU Part Number
+    - APU S/n              APU Serial Number
+    - PSN                  Power Source Number
+    - Aircraft Registration Aircraft registration identifier
+    - Reference Date       Date reference for the APU health data
+    - CT5                  Compressor Temperature 5 reading
+    - Workorder            Associated workorder number
+    - CT5ATP value         CT5 Actual To Plan value for APU health monitoring
+
+  ACCEPTANCE CRITERIA  (from Jira ticket)
+    - All 8 columns (APU P/n, APU S/n, PSN, Aircraft Registration, Reference Date, CT5, Workorder, CT5ATP value) are displayed in the APU Health Monitor sheet
+    - CT5ATP value column displays with no formatting when value is less than 630
+    - CT5ATP value column displays with Amber background color when value is equal to or greater than 630
+    - CT5ATP value column displays with Red background color when value is equal to or greater than 660
+    - Sheet is integrated into the existing Engine Dashboard
+    - Conditional formatting rules are applied dynamically based on CT5ATP values
+==============================================================
+    VDS path [dremio-db.apu_health.apu_health] (Enter to confirm or type override): 
+    App name [ADL-1699 - APU Health Monitor] (Enter to confirm): 
+    Qlik space [development] (Enter to confirm): 
+
+  Ready to build dashboard:
+    Ticket : ADL-1699  (Parthesh  |  ADL Sprint 48)
+    VDS    : dremio-db.apu_health.apu_health
+    App    : ADL-1699 - APU Health Monitor
+    Space  : development
+==============================================================
+    Proceed with Qlik dashboard creation? [y/n]: y
+
+  Connecting to Dremio and building dashboard ...
+    VDS   : dremio-db.apu_health.apu_health
+    App   : ADL-1699 - APU Health Monitor
+    Space : development
+
+
+==============================================================
+  QLIK SENSE DASHBOARD READY
+==============================================================
+
+Perfect! Your APU Health Monitor dashboard has been successfully created. Here are the details:
+
+---
+
+**Status**        : ? SUCCESS
+
+**Rows loaded**   : 26
+
+**Connection**    : Dremio_Cloud_EU (live REST connection)
+
+**App URL**       : https://v1kckqgoq2wc826.in.qlikcloud.com/sense/app/8a28e5e5-d1e6-4835-933a-2a378acea9d3/sheet/sh_e7b47c1e
+
+**App ID**        : 8a28e5e5-d1e6-4835-933a-2a378acea9d3
+
+**Space**         : development
+
+---
+
+**Dashboard Configuration:**
+- ? All 9 columns configured (APU P/n | APU S/n | PSN | Aircraft Reg. | Reference Date | Trend Type | Workorder | CT5ATP value | Aircraft Type)
+- ? Reference Date formatted as YYYY-MM-DD
+- ? CT5ATP value calculated as numeric field
+- ? Conditional formatting applied:
+  - **No color** when CT5ATP < 630
+  - **Amber background** when CT5ATP ? 630
+  - **Red background** when CT5ATP ? 660
+
+The dashboard is now live and ready to use. You can access it directly via the URL above. The data is pulled live from your Dremio VDS, so it will always reflect the latest APU health metrics.
+
+==============================================================
+
+  Validating local codebase against GitHub version ...INFO:     127.0.0.1:57889 - "GET / HTTP/1.1" 200 OK
+UI disconnected.
+INFO:     connection closed
+INFO:     127.0.0.1:57952 - "WebSocket /ws" [accepted]
+INFO:     connection open
+INFO:     127.0.0.1:49351 - "GET / HTTP/1.1" 200 OK
+UI disconnected.
+INFO:     connection closed
+INFO:     127.0.0.1:49409 - "WebSocket /ws" [accepted]
+INFO:     connection open
+INFO:     127.0.0.1:49352 - "GET / HTTP/1.1" 200 OK
+UI disconnected.
+INFO:     connection closed
+INFO:     127.0.0.1:50769 - "WebSocket /ws" [accepted]
+INFO:     connection open
+INFO:     127.0.0.1:60506 - "GET / HTTP/1.1" 200 OK
+UI disconnected.
+INFO:     connection closed
+INFO:     127.0.0.1:60506 - "GET /image/asllogo.jfif HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60563 - "WebSocket /ws" [accepted]
+INFO:     connection open
+INFO:     127.0.0.1:61900 - "GET / HTTP/1.1" 200 OK
+UI disconnected.
+INFO:     connection closed
+INFO:     127.0.0.1:61900 - "GET /image/asllogo.jpg HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61960 - "WebSocket /ws" [accepted]
+INFO:     connection open
+INFO:     127.0.0.1:61901 - "GET / HTTP/1.1" 200 OK
+UI disconnected.
+INFO:     connection closed
+INFO:     127.0.0.1:63042 - "WebSocket /ws" [accepted]
+INFO:     connection open
+
+==============================================================
+  SELECT PROJECT
+==============================================================
+  Loading projects ...
+  [1] ADL        ASL Data Lake   (default)
+  [2] ASL        ASL Integration Framework
+  [3] PSUD       Process Set up Dummy 
+  [0] Cancel
+==============================================================
+  Select project number (Enter for ADL): 1
+
+  Project set to ADL  (board id 2).
+
+==============================================================
+  ASL AIRLINES  --  ADL WORKFLOW  |  JIRA -> DOC -> DREMIO -> QLIK
+==============================================================
+  [1]  Work on an existing ticket  (browse sprint)
+  [2]  Browse backlog tickets
+  [3]  Create a new ticket
+  [4]  GitHub version control assistant
+  [0]  Exit
+==============================================================
+  Select option: 1
+
+  Loading sprints ... done
+
+==============================================================
+  SELECT SPRINT
+==============================================================
+  -- Active Sprint --
+  [ 1]  ADL Sprint 48  [ACTIVE]  <-- default
+
+  -- Recent Closed Sprints --
+  [ 2]  ADL Sprint 47  [CLOSED]
+  [ 3]  ADL Sprint 46  [CLOSED]
+  [ 4]  ADL Sprint 45  [CLOSED]
+  [ 5]  ADL Sprint 44  [CLOSED]
+  [ 6]  ADL Sprint 43  [CLOSED]
+  [ 7]  ADL Sprint 42  [CLOSED]
+  [ 8]  ADL Sprint 41  [CLOSED]
+  [ 9]  ADL Sprint 40  [CLOSED]
+  [10]  ADL Sprint 39  [CLOSED]
+  [11]  ADL Sprint 38  [CLOSED]
+  [ 0]  Back
+==============================================================
+  Select sprint number: 1
+
+  Selected: ADL Sprint 48  [ACTIVE]
+
+  Fetching tickets for ADL Sprint 48 ... done  (133 tickets found)
+
+==============================================================
+  ASSIGNEES  --  ADL Sprint 48
+==============================================================
+  [ 1]  Dhruv Mevada  (5 tickets)
+  [ 2]  Fenil Jain  (1 ticket)
+  [ 3]  Harini Reddy Godhala  (1 ticket)
+  [ 4]  Harsh Sanghvi  (11 tickets)
+  [ 5]  Isha Metange  (37 tickets)
+  [ 6]  Marmik Patel  (12 tickets)
+  [ 7]  Parthesh  (24 tickets)
+  [ 8]  Rashmi Pathak  (22 tickets)
+  [ 9]  Suhas Shete  (16 tickets)
+  [10]  Unassigned  (2 tickets)
+  [11]  dhaval.dangi  (1 ticket)
+  [12]  kamal prakash  (1 ticket)
+  [ 0]  Back
+==============================================================
+  Select assignee number: 9
+
+==============================================================
+  TICKETS  --  Suhas Shete
+==============================================================
+   #   Key       Status            Priority  Summary
+  --   --------- ----------------- --------- ---------------------------------------------
+   1   ADL-1724  In Progress       Medium    [Incomplete Material Picking]  Add more fields to the...
+   2   ADL-1721  Ready for review  Medium    Create Production Document for Training Status Report
+   3   ADL-1718  To Do             Medium    [Movement Manager] Python script has been failing at m...
+   4   ADL-1716  Ready for review  Medium    [ Finance ] - Move all the Tally VDS from Dev folder t...
+   5   ADL-1703  Ready for review  Medium    SAP Data Catalog
+   6   ADL-1701  In Progress       Medium    [APU Health Monitor] Create Document technical solution
+   7   ADL-1700  In Progress       Medium    [APU Health Monitor] Create query for APU Health Monit...
+   8   ADL-1684  To Do             Medium    [ Amos Training report ] - Create Staff PQS Qualificat...
+   9   ADL-1662  Ready for review  Medium    Create AOG and AOG updates VDS under fleet_mgmt foder...
+  10   ADL-1656  On hold           Medium    [MM Discrepancy Report] Payload Missing 
+  11   ADL-1589  Ready for prod    Medium    [Finance - Masters]   Create Foreign Exchange Master V...
+  12   ADL-1588  Ready for prod    Medium    [Finance Dashboard - Prod Issue]  FX calculation logic...
+  13   ADL-1585  Ready for prod    Medium    [Finance] - Opening and Closing Balance Mismatch for B...
+  14   ADL-1576  Ready for prod    Medium    [Finance P&L- Document Currency] Document currency val...
+  15   ADL-1525  On hold           Medium    [AMOS Upgrade] All dashboards should be running as it...
+  16   ADL-902   On hold           Medium    [Eagle Eye] Reflection for technical delay is working...
+   0   Back
+==============================================================
+  Select ticket number: 7
+
+==============================================================
+  SELECTED TICKET : ADL-1700
+==============================================================
+  Sprint   : ADL Sprint 48  [ACTIVE]
+  Summary  : [APU Health Monitor] Create query for APU Health Monitor in Engine Folder
+  State    : In Progress
+  Priority : Medium
+  Assignee : Suhas Shete
+==============================================================
+
+  Fetching full ticket details ... done
+
+  Jira Agent analyzing ticket ... done
+
+==============================================================
+  TICKET REQUIREMENTS  (extracted by Jira Agent)
+==============================================================
+  Ticket  : ADL-1700
+  Summary : [APU Health Monitor] Create query for APU Health Monitor in Engine Folder
+
+  Business Requirement:
+    Create a query for APU Health Monitor that extracts APU performance data from AMOS for APUs fitted to ASL AC Type B737NG aircraft. The query will join rotables and rotables_trend tables to provide APU part numbers, serial numbers, PSN identifiers, aircraft registration, reference dates, trend types (CT5), workorder information, and CT5ATP values, filtered to the latest reference date for each APU and B737NG aircraft type only.
+
+  Source Database : amos_acceptance
+  Source Tables (3):
+    - amos.rotables
+    - amos.rotables_trend
+    - amos.aircraft
+
+  Output Fields (9):
+    - partno: APU Part Number
+    - serialno: APU Serial Number
+    - psn: Unique PSN associated with each APU Serial Number
+    - ac_registr: Aircraft Registration
+    - ref_date: Reference Date (latest date only for each APU)
+    - trend_type: Trend Type (CT5)
+    - event_perfno_i: Workorder if present
+    - value: CT5ATP value
+    - ac_typ: Aircraft Type
+
+  Transformations (4):
+    - Join rotables table with rotables_trend table on psn field
+    - Join result with aircraft table on ac_registr field to filter by aircraft type
+    - For each APU (identified by psn), select only the row with the maximum ref_date (latest reference date)
+    - Retain event_perfno_i as-is, allowing NULL values where workorder is not present
+
+  Filters (3):
+    - aircraft.ac_typ = 'B737NG'
+    - rotables_trend.trend_type = 'CT5'
+    - rotables_trend.ref_date is the latest (maximum) date for each unique psn
+
+  Acceptance Criteria (7):
+    - Query returns all APUs of type B737NG with their latest CT5ATP trend data
+    - Each APU appears only once, showing its most recent reference date
+    - All required fields (partno, serialno, psn, ac_registr, ref_date, trend_type, event_perfno_i, value, ac_typ) are present in output
+    - Workorder field (event_perfno_i) correctly shows NULL when no workorder is associated
+    - VDS is created in Engine Folder
+    - Query executes successfully against AMOS Acceptance database
+    - Upon AMOS production go-live, data source can be switched to production without query logic changes
+==============================================================
+  Proceed to Documentation + Dremio Agent? [y/n]: INFO:     127.0.0.1:63978 - "GET / HTTP/1.1" 200 OK
+UI disconnected.
+INFO:     connection closed
+INFO:     127.0.0.1:64017 - "WebSocket /ws" [accepted]
+INFO:     connection open
+UI disconnected.
+INFO:     connection closed
+INFO:     127.0.0.1:56041 - "GET /image/asl_airlines_edited.mp4 HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:56041 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56041 - "GET /image/asllogo.jpg HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56129 - "WebSocket /ws" [accepted]
+INFO:     connection open
+
+==============================================================
+  SELECT PROJECT
+==============================================================
+  Loading projects ...
+INFO:     127.0.0.1:56041 - "GET / HTTP/1.1" 200 OK
+UI disconnected.
+INFO:     connection closed
+  [1] ADL        ASL Data Lake   (default)
+  [2] ASL        ASL Integration Framework
+  [3] PSUD       Process Set up Dummy 
+  [0] Cancel
+==============================================================
+INFO:     127.0.0.1:56226 - "WebSocket /ws" [accepted]
+INFO:     connection open
+  Select project number (Enter for ADL): 
+==============================================================
+  SELECT PROJECT
+==============================================================
+  Loading projects ...
+  [1] ADL        ASL Data Lake   (default)
+  [2] ASL        ASL Integration Framework
+  [3] PSUD       Process Set up Dummy 
+  [0] Cancel
+==============================================================
+  Select project number (Enter for ADL): 1
+
+  Project set to ADL  (board id 2).
+
+==============================================================
+  ASL AIRLINES  --  ADL WORKFLOW  |  JIRA -> DOC -> DREMIO -> QLIK
+==============================================================
+  [1]  Work on an existing ticket  (browse sprint)
+  [2]  Browse backlog tickets
+  [3]  Create a new ticket
+  [4]  GitHub version control assistant
+  [0]  Exit
+==============================================================
+  Select option: 1
+
+  Loading sprints ... done
+
+==============================================================
+  SELECT SPRINT
+==============================================================
+  -- Active Sprint --
+  [ 1]  ADL Sprint 48  [ACTIVE]  <-- default
+
+  -- Recent Closed Sprints --
+  [ 2]  ADL Sprint 47  [CLOSED]
+  [ 3]  ADL Sprint 46  [CLOSED]
+  [ 4]  ADL Sprint 45  [CLOSED]
+  [ 5]  ADL Sprint 44  [CLOSED]
+  [ 6]  ADL Sprint 43  [CLOSED]
+  [ 7]  ADL Sprint 42  [CLOSED]
+  [ 8]  ADL Sprint 41  [CLOSED]
+  [ 9]  ADL Sprint 40  [CLOSED]
+  [10]  ADL Sprint 39  [CLOSED]
+  [11]  ADL Sprint 38  [CLOSED]
+  [ 0]  Back
+==============================================================
+  Select sprint number: 1
+
+  Selected: ADL Sprint 48  [ACTIVE]
+
+  Fetching tickets for ADL Sprint 48 ... done  (133 tickets found)
+
+==============================================================
+  ASSIGNEES  --  ADL Sprint 48
+==============================================================
+  [ 1]  Dhruv Mevada  (5 tickets)
+  [ 2]  Fenil Jain  (1 ticket)
+  [ 3]  Harini Reddy Godhala  (1 ticket)
+  [ 4]  Harsh Sanghvi  (11 tickets)
+  [ 5]  Isha Metange  (37 tickets)
+  [ 6]  Marmik Patel  (12 tickets)
+  [ 7]  Parthesh  (24 tickets)
+  [ 8]  Rashmi Pathak  (22 tickets)
+  [ 9]  Suhas Shete  (16 tickets)
+  [10]  Unassigned  (2 tickets)
+  [11]  dhaval.dangi  (1 ticket)
+  [12]  kamal prakash  (1 ticket)
+  [ 0]  Back
+==============================================================
+  Select assignee number: 9
+
+==============================================================
+  TICKETS  --  Suhas Shete
+==============================================================
+   #   Key       Status            Priority  Summary
+  --   --------- ----------------- --------- ---------------------------------------------
+   1   ADL-1724  In Progress       Medium    [Incomplete Material Picking]  Add more fields to the...
+   2   ADL-1721  Ready for review  Medium    Create Production Document for Training Status Report
+   3   ADL-1718  To Do             Medium    [Movement Manager] Python script has been failing at m...
+   4   ADL-1716  Ready for review  Medium    [ Finance ] - Move all the Tally VDS from Dev folder t...
+   5   ADL-1703  Ready for review  Medium    SAP Data Catalog
+   6   ADL-1701  In Progress       Medium    [APU Health Monitor] Create Document technical solution
+   7   ADL-1700  In Progress       Medium    [APU Health Monitor] Create query for APU Health Monit...
+   8   ADL-1684  To Do             Medium    [ Amos Training report ] - Create Staff PQS Qualificat...
+   9   ADL-1662  Ready for review  Medium    Create AOG and AOG updates VDS under fleet_mgmt foder...
+  10   ADL-1656  On hold           Medium    [MM Discrepancy Report] Payload Missing 
+  11   ADL-1589  Ready for prod    Medium    [Finance - Masters]   Create Foreign Exchange Master V...
+  12   ADL-1588  Ready for prod    Medium    [Finance Dashboard - Prod Issue]  FX calculation logic...
+  13   ADL-1585  Ready for prod    Medium    [Finance] - Opening and Closing Balance Mismatch for B...
+  14   ADL-1576  Ready for prod    Medium    [Finance P&L- Document Currency] Document currency val...
+  15   ADL-1525  On hold           Medium    [AMOS Upgrade] All dashboards should be running as it...
+  16   ADL-902   On hold           Medium    [Eagle Eye] Reflection for technical delay is working...
+   0   Back
+==============================================================
+  Select ticket number: 7
+
+==============================================================
+  SELECTED TICKET : ADL-1700
+==============================================================
+  Sprint   : ADL Sprint 48  [ACTIVE]
+  Summary  : [APU Health Monitor] Create query for APU Health Monitor in Engine Folder
+  State    : In Progress
+  Priority : Medium
+  Assignee : Suhas Shete
+==============================================================
+
+  Fetching full ticket details ... done
+
+  Jira Agent analyzing ticket ... done
+
+==============================================================
+  TICKET REQUIREMENTS  (extracted by Jira Agent)
+==============================================================
+  Ticket  : ADL-1700
+  Summary : [APU Health Monitor] Create query for APU Health Monitor in Engine Folder
+
+  Business Requirement:
+    Create a query for APU Health Monitor that retrieves APU performance data from AMOS for APUs fitted to ASL AC Type B737NG aircraft. The query will join rotables and rotables_trend tables to provide APU part numbers, serial numbers, PSN identifiers, aircraft registration, reference dates, trend types (CT5), workorder information, and CT5ATP values, filtered for B737NG aircraft type only.
+
+  Source Database : amos_acceptance
+  Source Tables (3):
+    - amos.rotables
+    - amos.rotables_trend
+    - amos.aircraft
+
+  Output Fields (10):
+    - partno: APU Part Number
+    - serialno: APU Serial Number
+    - psn: Unique PSN associated with each APU Serial Number
+    - ac_registr: Aircraft Registration
+    - rt_psn: PSN from rotables_trend table
+    - ref_date: Reference Date (latest date only for each APU)
+    - trend_type: Trend Type (CT5)
+    - event_perfno_i: Workorder if present
+    - value: CT5ATP value
+    - ac_typ: Aircraft Type
+
+  Transformations (4):
+    - Join rotables table to rotables_trend table on PSN field
+    - Join rotables table to aircraft table on aircraft registration to retrieve aircraft type
+    - Select only the latest reference date for each APU PSN
+    - Filter rotables_trend records where trend_type equals CT5
+
+  Filters (3):
+    - aircraft.ac_typ = 'B737NG'
+    - rotables_trend.trend_type = 'CT5'
+    - rotables_trend.ref_date is the maximum date for each unique PSN
+
+  Acceptance Criteria (6):
+    - Query returns all APUs fitted to B737NG aircraft type
+    - Only the latest reference date is returned for each APU
+    - CT5 trend type data is correctly filtered and displayed
+    - All required fields are present in the output
+    - VDS is created in Engine Folder
+    - Query executes against AMOS Acceptance environment initially, with migration path to AMOS Production upon go-live
+==============================================================
+  Proceed to Documentation + Dremio Agent? [y/n]: y
+
+==============================================================
+  DOCUMENTATION AGENT  �  Technical Implementation Document
+==============================================================
+  Generating Technical Implementation Document from ticket requirements ...
+  (This calls the configured LLM � may take 15�30 seconds)
+
+
+  Document saved: E:\LLM\Claude\Project Documentation\ADL-1700_20260607_203410.docx
+  Open it in Word for review and sign-off.
+
+  Proceed to Dremio Agent? [y/n]: y
+  Cooling down 5s to reset API rate limit window ... ready.
+
+
+==============================================================
+  DREMIO AGENT  --  Select Operation
+==============================================================
+  [1] Generate VDS query from ticket requirements  (recommended)
+  [2] Preview existing table or view
+  [3] Browse catalog folder / list views
+  [4] Execute a SQL query
+  [5] Validate SQL
+  [6] Create Virtual Dataset (provide SQL manually)
+  [7] Update existing VDS
+  [8] Free-text query (ask the Dremio Agent anything)
+  [0] Exit Dremio Agent
+==============================================================
+  Select option: 1
+
+  Generating SQL (attempt 1) ...
+  [auto-fix] Dremio SQL generation � applying fix and saving to memory ...
+  [memory] error + fix saved for future runs.
+
+==============================================================
+  GENERATED SQL  (attempt 1  |  ADL-1700)
+==============================================================
+
+-- VDS: APU Health Monitor
+-- Description: APU performance data from AMOS for APUs fitted to ASL AC Type B737NG aircraft
+-- Source: amos_postgres.amos (rotables, rotables_trend, aircraft)
+-- Owner: Engine Folder
+-- Ticket: ADL-1700
+
+WITH apu_latest_trend AS (
+  SELECT
+    rt.psn,
+    rt.ref_date,
+    rt.trend_type,
+    rt."value",
+    rt.event_perfno_i,
+    ROW_NUMBER() OVER (PARTITION BY rt.psn ORDER BY rt.ref_date DESC) AS rn
+  FROM amos_postgres.amos.rotables_trend rt
+  WHERE UPPER(rt.trend_type) = UPPER('CT5')
+    AND rt.ref_date IS NOT NULL
+)
+SELECT
+  r.partno,
+  r.serialno,
+  r.psn,
+  r.ac_registr,
+  alt.psn AS rt_psn,
+  DATE_ADD(DATE '1971-12-31', CAST(alt.ref_date AS BIGINT)) AS ref_date,
+  alt.trend_type,
+  alt.event_perfno_i,
+  alt."value",
+  a.ac_typ
+FROM amos_postgres.amos.rotables r
+INNER JOIN apu_latest_trend alt
+  ON r.psn = alt.psn
+  AND alt.rn = 1
+LEFT JOIN amos_postgres.amos.aircraft a
+  ON UPPER(r.ac_registr) = UPPER(a.ac_registr)
+WHERE UPPER(a.ac_typ) = UPPER('B737NG')
+
+==============================================================
+  [1] Approve and save to file
+  [2] Regenerate with feedback
+  [3] Discard and return to menu
+==============================================================
+  Select [1/2/3]: 1
+
+  SQL saved: E:\LLM\Claude\adl_automated_delivery_pipeline\generated_queries\ADL-1700_20260607_203524.sql
+
+  Create VDS in Dremio now? [y/n]: y
+
+==============================================================
+  CREATE VDS  �  Step 1: Choose folder in dremio-db
+==============================================================
+  Fetching existing folders under dremio-db ... done  (24 folders found)
+
+  Existing folders under dremio-db:
+  [ 1]  dremio-db.Dev
+  [ 2]  dremio-db.Self_Service
+  [ 3]  dremio-db.amos_business_continuity
+  [ 4]  dremio-db.amos_training_status_report
+  [ 5]  dremio-db.apu_health
+  [ 6]  dremio-db.bi_server
+  [ 7]  dremio-db.cezanne_emp_directory
+  [ 8]  dremio-db.climate_transition_plan
+  [ 9]  dremio-db.daily_fleet_status
+  [10]  dremio-db.document_status_change
+  [11]  dremio-db.eagle_eye
+  [12]  dremio-db.engine_fleet_status
+  [13]  dremio-db.finance
+  [14]  dremio-db.fleet_mgmt
+  [15]  dremio-db.hoc
+  [16]  dremio-db.if_team
+  [17]  dremio-db.incomplete_material_picking
+  [18]  dremio-db.intercompany
+  [19]  dremio-db.inventory
+  [20]  dremio-db.maintenance_forecast_alert
+  [21]  dremio-db.maintenance_reliability_report
+  [22]  dremio-db.maintenance_reserve
+  [23]  dremio-db.occ
+  [24]  dremio-db.source
+  [ 0]  Create a new folder under dremio-db
+  [ C]  Cancel
+==============================================================
+  Select folder: 5
+
+==============================================================
+  CREATE VDS  �  Step 2: Inside dremio-db.apu_health
+==============================================================
+  You are now inside: dremio-db.apu_health
+    Sub-folder name (leave blank to use this folder directly): 
+
+==============================================================
+  CREATE VDS  �  Step 3: Name the VDS in dremio-db.apu_health
+==============================================================
+  Current location : dremio-db.apu_health
+  Suggested VDS name (from ticket/SQL): APU Health Monitor
+
+    VDS name [APU Health Monitor]: apu_health
+
+  VDS will be saved as:
+    dremio-db.apu_health.apu_health
+  
+  Confirm? [y/n]: y
+
+  A VDS named apu_health already exists at dremio-db.apu_health.apu_health.
+    Do you want to [b]ackup, [d]elete, or [c]ancel? [b/d/c]: d
+  Deleting existing VDS...
+  Old VDS deleted.
+
+  Creating VDS at dremio-db.apu_health.apu_health ...
+  SQL validated OK. Creating VDS ...
+  VDS created successfully!
+  ID  : {"tableKey":["dremio-db","apu_health","apu_health"],"contentId":"8efd420a-b966-4d47-9f1a-315f5c28c06c","versionContext":{"type":"BRANCH","value":"main"}}
+  Path: dremio-db.apu_health.apu_health
+
+  Build QlikSense dashboard from this VDS? [y/n]: y
+  Is there a separate JIRA ticket for Qlik? [y/n]: y
+
+  [1] Work on an existing Qlik ticket (browse sprint)
+  [2] Browse Qlik backlog tickets
+  [0] Cancel / use original ticket
+  Select option: 1
+
+  Loading sprints ... done
+
+==============================================================
+  SELECT SPRINT
+==============================================================
+  -- Active Sprint --
+  [ 1]  ADL Sprint 48  [ACTIVE]  <-- default
+
+  -- Recent Closed Sprints --
+  [ 2]  ADL Sprint 47  [CLOSED]
+  [ 3]  ADL Sprint 46  [CLOSED]
+  [ 4]  ADL Sprint 45  [CLOSED]
+  [ 5]  ADL Sprint 44  [CLOSED]
+  [ 6]  ADL Sprint 43  [CLOSED]
+  [ 7]  ADL Sprint 42  [CLOSED]
+  [ 8]  ADL Sprint 41  [CLOSED]
+  [ 9]  ADL Sprint 40  [CLOSED]
+  [10]  ADL Sprint 39  [CLOSED]
+  [11]  ADL Sprint 38  [CLOSED]
+  [ 0]  Back
+==============================================================
+  Select sprint number: 1
+
+  Selected: ADL Sprint 48  [ACTIVE]
+
+==============================================================
+  ASSIGNEES  --  ADL Sprint 48
+==============================================================
+  [ 1]  Dhruv Mevada  (5 tickets)
+  [ 2]  Fenil Jain  (1 ticket)
+  [ 3]  Harini Reddy Godhala  (1 ticket)
+  [ 4]  Harsh Sanghvi  (11 tickets)
+  [ 5]  Isha Metange  (37 tickets)
+  [ 6]  Marmik Patel  (12 tickets)
+  [ 7]  Parthesh  (24 tickets)
+  [ 8]  Rashmi Pathak  (22 tickets)
+  [ 9]  Suhas Shete  (16 tickets)
+  [10]  Unassigned  (2 tickets)
+  [11]  dhaval.dangi  (1 ticket)
+  [12]  kamal prakash  (1 ticket)
+  [ 0]  Back
+==============================================================
+  Select assignee number: 7
+
+==============================================================
+  TICKETS  --  Parthesh
+==============================================================
+   #   Key       Status            Priority  Summary
+  --   --------- ----------------- --------- ---------------------------------------------
+   1   ADL-1730  To Do             Medium    [Finance - Asset and finance detailed sheet] - assigne...
+   2   ADL-1727  To Do             Medium    [Finance Dashboard] Update Qlik dashboard to include a...
+   3   ADL-1726  To Do             Medium    [Finanace] Show Tally P&L and BS data in Finance Repor...
+   4   ADL-1720  To Do             Medium    [Finance Asset] - QLIK - Add posting item column in As...
+   5   ADL-1717  To Do             Medium    [Finance] Update the Qlik template CMBBS sheet for Sta...
+   6   ADL-1715  To Do             Medium    [Finance - Prod Issue] - Accounts with Statutory/CMB C...
+   7   ADL-1702  To Do             Medium    [APU Health Monitor] Implement automated report schedu...
+   8   ADL-1699  In Progress       Medium    [APU Health Monitor] Create APU Health Monitor dashboa...
+   9   ADL-1664  To Do             Medium    [Incomplete Material Picking]  Add more fields to the...
+  10   ADL-1645  Ready for prod    Medium    [MM Discrepancy Report] UAT feedbacks
+  11   ADL-1618  Ready for prod    Medium    [Finance Dashboard - Prod Defect] - Cost center dimens...
+  12   ADL-1614  Done              Medium    [AIMS MM Discrepancy - Production Issue]  Dashboard wa...
+  13   ADL-1602  Done              Medium    Transfer ownership to svc_analytics@aslairlines.com in...
+  14   ADL-1595  Done              Medium    Change the Current Qlik report Email setting to OAuth...
+  15   ADL-1593  Ready for prod    Medium    [Finance P&L Document Currency] Currency INR and SAR a...
+  16   ADL-1592  Ready for prod    Medium    [Finance P&L - Document Currency]  Header should get u...
+  17   ADL-1591  Ready for prod    Medium    [Finance Dashboard - Detailed Verison] Update existing...
+  18   ADL-1590  Ready for prod    Medium    [Finance - Masters]   Create Foreign Exchange Master S...
+  19   ADL-1586  Ready for prod    Medium    [Finance P&L - Document Currency]  Provide toggle for...
+  20   ADL-1579  On hold           Medium    [Finance] - Qlik Showing Extra Decimal Digits Compared...
+  21   ADL-1574  Done              Medium    [Finance Report - Detailed Version]  Add foreign excha...
+  22   ADL-1540  On hold           Medium    [R&D] feasibility check for fetching active directory...
+  23   ADL-1516  Done              Medium    [Finance Report - Detailed Version - Production Defect...
+  24   ADL-1140  To Do             Medium    [Finance P&L] - Incorrect Data Display when selecting...
+   0   Back
+==============================================================
+  Select ticket number: 8
+
+  Fetching full Qlik ticket details ... done
+
+  Jira Agent analyzing ticket ... done
+
+==============================================================
+  TICKET REQUIREMENTS  (extracted by Jira Agent)
+==============================================================
+  Ticket  : ADL-1699
+  Summary : [APU Health Monitor] Create APU Health Monitor dashboard in Engine Status Dashboard
+
+  Business Requirement:
+    Create a new APU Health Monitor sheet in the existing Engine Dashboard that displays APU performance data with 8 key columns including part number, serial number, PSN, aircraft registration, reference date, CT5, workorder, and CT5ATP value. Apply conditional formatting to the CT5ATP value column based on threshold values to visually highlight performance status.
+
+  Source Database : amos_postgres
+  Source Tables (3):
+    - amos.apu
+    - amos.aircraft
+    - amos.workorder
+
+  Output Fields (8):
+    - APU P/n: APU Part Number
+    - APU S/n: APU Serial Number
+    - PSN: Power Source Number or identifier
+    - Aircraft Registration: Aircraft registration code or tail number
+    - Reference Date: Date reference for the health monitoring record
+    - CT5: Compressor Temperature 5 reading
+    - Workorder: Associated workorder number
+    - CT5ATP value: CT5 Actual To Plan value for APU performance monitoring
+
+  Transformations (8):
+    - Extract APU part number from APU master data
+    - Extract APU serial number from APU master data
+    - Extract PSN identifier from APU configuration
+    - Join aircraft registration from aircraft master table
+    - Convert reference date to standard date format
+    - Extract CT5 temperature reading from APU performance metrics
+    - Link workorder number from workorder table
+    - Calculate or extract CT5ATP value as the actual to plan ratio
+
+  Filters (2):
+    - Include only active APU records
+    - Include only records with valid CT5ATP values
+
+  Acceptance Criteria (6):
+    - All 8 columns are displayed in the APU Health Monitor sheet
+    - CT5ATP value column displays with no formatting when value is less than 630
+    - CT5ATP value column displays with amber background when value is equal to or greater than 630
+    - CT5ATP value column displays with red background when value is equal to or greater than 660
+    - Sheet is integrated into the existing Engine Dashboard
+    - Data is accurately populated from source tables
+==============================================================
+
+==============================================================
+  QLIK AGENT  �  PRE-FLIGHT CHECK
+==============================================================
+  Fetching latest ticket data for ADL-1699 ... done
+
+  JIRA TICKET
+  Ticket ID     : ADL-1699
+  Summary       : [APU Health Monitor] Create APU Health Monitor dashboard in Engine Status Dashboard
+  Assignee      : Parthesh
+  Sprint        : ADL Sprint 48
+  Priority      : Medium
+  State         : In Progress
+
+  DREMIO VDS  (from Dremio Agent)
+  VDS Path      : dremio-db.apu_health.apu_health
+
+  OUTPUT FIELDS  (from Jira ticket � will become dashboard columns)
+    - APU P/n              APU Part Number
+    - APU S/n              APU Serial Number
+    - PSN                  Power Source Number or identifier
+    - Aircraft Registration Aircraft registration code or tail number
+    - Reference Date       Date reference for the health monitoring record
+    - CT5                  Compressor Temperature 5 reading
+    - Workorder            Associated workorder number
+    - CT5ATP value         CT5 Actual To Plan value for APU performance monitoring
+
+  FILTERS  (from Jira ticket)
+    - Include only active APU records
+    - Include only records with valid CT5ATP values
+
+  ACCEPTANCE CRITERIA  (from Jira ticket)
+    - All 8 columns are displayed in the APU Health Monitor sheet
+    - CT5ATP value column displays with no formatting when value is less than 630
+    - CT5ATP value column displays with amber background when value is equal to or greater than 630
+    - CT5ATP value column displays with red background when value is equal to or greater than 660
+    - Sheet is integrated into the existing Engine Dashboard
+    - Data is accurately populated from source tables
+==============================================================
+    VDS path [dremio-db.apu_health.apu_health] (Enter to confirm or type override): 
+    App name [ADL-1699 - APU Health Monitor] (Enter to confirm): 
+    Qlik space [development] (Enter to confirm): 
+
+  Ready to build dashboard:
+    Ticket : ADL-1699  (Parthesh  |  ADL Sprint 48)
+    VDS    : dremio-db.apu_health.apu_health
+    App    : ADL-1699 - APU Health Monitor
+    Space  : development
+==============================================================
+    Proceed with Qlik dashboard creation? [y/n]: y
+
+  Connecting to Dremio and building dashboard ...
+    VDS   : dremio-db.apu_health.apu_health
+    App   : ADL-1699 - APU Health Monitor
+    Space : development
+
+
+==============================================================
+  QLIK SENSE DASHBOARD READY
+==============================================================
+
+Perfect! Your APU Health Monitor dashboard has been successfully created. Here are the details:
+
+---
+
+**Status**        : ? SUCCESS
+
+**Rows loaded**   : 26
+
+**Connection**    : Dremio_Cloud_EU (live REST connection)
+
+**App URL**       : https://v1kckqgoq2wc826.in.qlikcloud.com/sense/app/566fb35d-5aaf-43db-a8f2-2d02a293bb38/sheet/sh_6dbfa4c5
+
+**App ID**        : 566fb35d-5aaf-43db-a8f2-2d02a293bb38
+
+**Space**         : development
+
+---
+
+**Dashboard Configuration:**
+- ? 9-column table with all required fields:
+  - APU P/n | APU S/n | PSN | Aircraft Reg. | Reference Date | Trend Type | Workorder | CT5ATP value | Aircraft Type
+
+- ? **Conditional Formatting Applied:**
+  - **No colour** ? CT5ATP < 630
+  - **Amber background** ? CT5ATP ? 630
+  - **Red background** ? CT5ATP ? 660
+
+The dashboard is now live in the **development** space and ready for use. You can access it directly via the link above. The data is pulled live from your Dremio VDS and will reflect the latest APU health metrics.
+
+==============================================================
+
+  Validating local codebase against GitHub version ...INFO:     127.0.0.1:58368 - "GET / HTTP/1.1" 200 OK
+UI disconnected.
+INFO:     connection closed
+INFO:     127.0.0.1:58436 - "WebSocket /ws" [accepted]
+INFO:     connection open
+INFO:     127.0.0.1:58368 - "GET / HTTP/1.1" 200 OK
+UI disconnected.
+INFO:     connection closed
+INFO:     127.0.0.1:58524 - "WebSocket /ws" [accepted]
+INFO:     connection open
+
+==============================================================
+  SELECT PROJECT
+==============================================================
+  Loading projects ...
+  [1] ADL        ASL Data Lake   (default)
+  [2] ASL        ASL Integration Framework
+  [3] PSUD       Process Set up Dummy 
+  [0] Cancel
+==============================================================
+  Select project number (Enter for ADL): 
+
+  Project set to ADL  (board id 2).
+
+==============================================================
+  ASL AIRLINES  --  ADL WORKFLOW  |  JIRA -> DOC -> DREMIO -> QLIK
+==============================================================
+  [1]  Work on an existing ticket  (browse sprint)
+  [2]  Browse backlog tickets
+  [3]  Create a new ticket
+  [4]  GitHub version control assistant
+  [0]  Exit
+==============================================================
+  Select option: INFO:     127.0.0.1:58371 - "GET / HTTP/1.1" 200 OK
+UI disconnected.
+INFO:     connection closed
+INFO:     127.0.0.1:58908 - "WebSocket /ws" [accepted]
+INFO:     connection open
+
+==============================================================
+  SELECT PROJECT
+==============================================================
+  Loading projects ...
+  [1] ADL        ASL Data Lake   (default)
+  [2] ASL        ASL Integration Framework
+  [3] PSUD       Process Set up Dummy 
+  [0] Cancel
+==============================================================
+  Select project number (Enter for ADL): INFO:     127.0.0.1:58376 - "GET / HTTP/1.1" 200 OK
+UI disconnected.
+INFO:     connection closed
+INFO:     127.0.0.1:59058 - "WebSocket /ws" [accepted]
+INFO:     connection open
+
+==============================================================
+  SELECT PROJECT
+==============================================================
+  Loading projects ...
+  [1] ADL        ASL Data Lake   (default)
+  [2] ASL        ASL Integration Framework
+  [3] PSUD       Process Set up Dummy 
+  [0] Cancel
+==============================================================
+  Select project number (Enter for ADL): 2
+
+  Project set to ASL  (board id 1).
+
+==============================================================
+  ASL AIRLINES  --  ASL WORKFLOW  |  JIRA -> DOC -> DREMIO -> QLIK
+==============================================================
+  [1]  Work on an existing ticket  (browse sprint)
+  [2]  Browse backlog tickets
+  [3]  Create a new ticket
+  [4]  GitHub version control assistant
+  [0]  Exit
+==============================================================
+  Select option: INFO:     127.0.0.1:59028 - "GET / HTTP/1.1" 200 OK
+UI disconnected.
+INFO:     connection closed
+INFO:     127.0.0.1:59496 - "WebSocket /ws" [accepted]
+INFO:     connection open
+
+==============================================================
+  SELECT PROJECT
+==============================================================
+  Loading projects ...
+  [1] ADL        ASL Data Lake
+  [2] ASL        ASL Integration Framework   (default)
+  [3] PSUD       Process Set up Dummy 
+  [0] Cancel
+==============================================================
+  Select project number (Enter for ASL): INFO:     127.0.0.1:59028 - "GET / HTTP/1.1" 200 OK
+UI disconnected.
+INFO:     connection closed
+INFO:     127.0.0.1:59609 - "WebSocket /ws" [accepted]
+INFO:     connection open
+
+==============================================================
+  SELECT PROJECT
+==============================================================
+  Loading projects ...
+  [1] ADL        ASL Data Lake
+  [2] ASL        ASL Integration Framework   (default)
+  [3] PSUD       Process Set up Dummy 
+  [0] Cancel
+==============================================================
+  Select project number (Enter for ASL): 2
+
+  Project set to ASL  (board id 1).
+
+==============================================================
+  ASL AIRLINES  --  ASL WORKFLOW  |  JIRA -> DOC -> DREMIO -> QLIK
+==============================================================
+  [1]  Work on an existing ticket  (browse sprint)
+  [2]  Browse backlog tickets
+  [3]  Create a new ticket
+  [4]  GitHub version control assistant
+  [0]  Exit
+==============================================================
+  Select option: 1
+
+  Loading sprints ... done
+
+==============================================================
+  SELECT SPRINT
+==============================================================
+
+  -- Recent Closed Sprints --
+  [ 1]  ASL IF Sprint 55  [CLOSED]
+  [ 2]  ASL IF Sprint 54  [CLOSED]
+  [ 3]  ASL IF Sprint 53  [CLOSED]
+  [ 4]  ASL IF Sprint 52  [CLOSED]
+  [ 5]  ASL IF Sprint 51  [CLOSED]
+  [ 6]  ASL IF Sprint 50  [CLOSED]
+  [ 7]  ASL IF Sprint 49  [CLOSED]
+  [ 8]  ASL IF Sprint 48  [CLOSED]
+  [ 9]  ASL IF Sprint 47  [CLOSED]
+  [10]  ASL IF Sprint 46  [CLOSED]
+  [ 0]  Back
+==============================================================
+  Select sprint number: INFO:     127.0.0.1:52202 - "GET / HTTP/1.1" 200 OK
+UI disconnected.
+INFO:     connection closed
+INFO:     127.0.0.1:52250 - "WebSocket /ws" [accepted]
+INFO:     connection open
+
+==============================================================
+  SELECT PROJECT
+==============================================================
+  Loading projects ...
+INFO:     127.0.0.1:52203 - "GET / HTTP/1.1" 200 OK
+UI disconnected.
+INFO:     connection closed
+  [1] ADL        ASL Data Lake
+  [2] ASL        ASL Integration Framework   (default)
+  [3] PSUD       Process Set up Dummy 
+  [0] Cancel
+==============================================================
+INFO:     127.0.0.1:52384 - "WebSocket /ws" [accepted]
+INFO:     connection open
+  Select project number (Enter for ASL): 
+==============================================================
+  SELECT PROJECT
+==============================================================
+  Loading projects ...
+  [1] ADL        ASL Data Lake
+  [2] ASL        ASL Integration Framework   (default)
+  [3] PSUD       Process Set up Dummy 
+  [0] Cancel
+==============================================================
+  Select project number (Enter for ASL): 2
+
+  Project set to ASL  (board id 1).
+
+==============================================================
+  ASL AIRLINES  --  ASL WORKFLOW  |  JIRA -> DOC -> DREMIO -> QLIK
+==============================================================
+  [1]  Work on an existing ticket  (browse sprint)
+  [2]  Browse backlog tickets
+  [3]  Create a new ticket
+  [4]  GitHub version control assistant
+  [0]  Exit
+==============================================================
+  Select option: 1
+
+  Loading sprints ... done
+
+==============================================================
+  SELECT SPRINT
+==============================================================
+
+  -- Recent Closed Sprints --
+  [ 1]  ASL IF Sprint 55  [CLOSED]
+  [ 2]  ASL IF Sprint 54  [CLOSED]
+  [ 3]  ASL IF Sprint 53  [CLOSED]
+  [ 4]  ASL IF Sprint 52  [CLOSED]
+  [ 5]  ASL IF Sprint 51  [CLOSED]
+  [ 6]  ASL IF Sprint 50  [CLOSED]
+  [ 7]  ASL IF Sprint 49  [CLOSED]
+  [ 8]  ASL IF Sprint 48  [CLOSED]
+  [ 9]  ASL IF Sprint 47  [CLOSED]
+  [10]  ASL IF Sprint 46  [CLOSED]
+  [ 0]  Back
+==============================================================
+  Select sprint number: INFO:     127.0.0.1:58902 - "GET / HTTP/1.1" 200 OK
+UI disconnected.
+INFO:     connection closed
+INFO:     127.0.0.1:58965 - "WebSocket /ws" [accepted]
+INFO:     connection open
+
+==============================================================
+  SELECT PROJECT
+==============================================================
+  Loading projects ...
+  [1] ADL        ASL Data Lake
+  [2] ASL        ASL Integration Framework   (default)
+  [3] PSUD       Process Set up Dummy 
+  [0] Cancel
+==============================================================
+  Select project number (Enter for ASL): INFO:     127.0.0.1:58903 - "GET / HTTP/1.1" 200 OK
+UI disconnected.
+INFO:     connection closed
+INFO:     127.0.0.1:59206 - "WebSocket /ws" [accepted]
+INFO:     connection open
+
+==============================================================
+  SELECT PROJECT
+==============================================================
+  Loading projects ...
+  [1] ADL        ASL Data Lake
+  [2] ASL        ASL Integration Framework   (default)
+  [3] PSUD       Process Set up Dummy 
+  [0] Cancel
+==============================================================
+  Select project number (Enter for ASL): 2
+
+  Project set to ASL  (board id 1).
+
+==============================================================
+  ASL AIRLINES  --  ASL WORKFLOW  |  JIRA -> DOC -> DREMIO -> QLIK
+==============================================================
+  [1]  Work on an existing ticket  (browse sprint)
+  [2]  Browse backlog tickets
+  [3]  Create a new ticket
+  [4]  GitHub version control assistant
+  [0]  Exit
+==============================================================
+  Select option: 1
+
+  Loading sprints ... done
+
+==============================================================
+  SELECT SPRINT
+==============================================================
+
+  -- Recent Closed Sprints --
+  [ 1]  ASL IF Sprint 55  [CLOSED]
+  [ 2]  ASL IF Sprint 54  [CLOSED]
+  [ 3]  ASL IF Sprint 53  [CLOSED]
+  [ 4]  ASL IF Sprint 52  [CLOSED]
+  [ 5]  ASL IF Sprint 51  [CLOSED]
+  [ 6]  ASL IF Sprint 50  [CLOSED]
+  [ 7]  ASL IF Sprint 49  [CLOSED]
+  [ 8]  ASL IF Sprint 48  [CLOSED]
+  [ 9]  ASL IF Sprint 47  [CLOSED]
+  [10]  ASL IF Sprint 46  [CLOSED]
+  [ 0]  Back
+==============================================================
+  Select sprint number: INFO:     127.0.0.1:62830 - "GET / HTTP/1.1" 200 OK
+UI disconnected.
+INFO:     connection closed
+INFO:     127.0.0.1:62870 - "WebSocket /ws" [accepted]
+INFO:     connection open
+
+==============================================================
+  SELECT PROJECT
+==============================================================
+  Loading projects ...
+  [1] ADL        ASL Data Lake
+  [2] ASL        ASL Integration Framework   (default)
+  [3] PSUD       Process Set up Dummy 
+  [0] Cancel
+==============================================================
+  Select project number (Enter for ASL): INFO:     127.0.0.1:62831 - "GET / HTTP/1.1" 200 OK
+UI disconnected.
+INFO:     connection closed
+INFO:     127.0.0.1:63034 - "WebSocket /ws" [accepted]
+INFO:     connection open
+
+==============================================================
+  SELECT PROJECT
+==============================================================
+  Loading projects ...
+  [1] ADL        ASL Data Lake
+  [2] ASL        ASL Integration Framework   (default)
+  [3] PSUD       Process Set up Dummy 
+  [0] Cancel
+==============================================================
+  Select project number (Enter for ASL): 2
+
+  Project set to ASL  (board id 1).
+
+==============================================================
+  ASL AIRLINES  --  ASL WORKFLOW  |  JIRA -> DOC -> DREMIO -> QLIK
+==============================================================
+  [1]  Work on an existing ticket  (browse sprint)
+  [2]  Browse backlog tickets
+  [3]  Create a new ticket
+  [4]  GitHub version control assistant
+  [0]  Exit
+==============================================================
+  Select option: 1
+
+  Loading sprints ... done
+
+==============================================================
+  SELECT SPRINT
+==============================================================
+
+  -- Recent Closed Sprints --
+  [ 1]  ASL IF Sprint 55  [CLOSED]
+  [ 2]  ASL IF Sprint 54  [CLOSED]
+  [ 3]  ASL IF Sprint 53  [CLOSED]
+  [ 4]  ASL IF Sprint 52  [CLOSED]
+  [ 5]  ASL IF Sprint 51  [CLOSED]
+  [ 6]  ASL IF Sprint 50  [CLOSED]
+  [ 7]  ASL IF Sprint 49  [CLOSED]
+  [ 8]  ASL IF Sprint 48  [CLOSED]
+  [ 9]  ASL IF Sprint 47  [CLOSED]
+  [10]  ASL IF Sprint 46  [CLOSED]
+  [ 0]  Back
+==============================================================
+  Select sprint number: INFO:     127.0.0.1:56319 - "GET / HTTP/1.1" 200 OK
+UI disconnected.
+INFO:     connection closed
+INFO:     127.0.0.1:56358 - "WebSocket /ws" [accepted]
+INFO:     connection open
+
+==============================================================
+  SELECT PROJECT
+==============================================================
+  Loading projects ...
+  [1] ADL        ASL Data Lake
+  [2] ASL        ASL Integration Framework   (default)
+  [3] PSUD       Process Set up Dummy 
+  [0] Cancel
+==============================================================
+  Select project number (Enter for ASL): INFO:     127.0.0.1:56320 - "GET / HTTP/1.1" 200 OK
+UI disconnected.
+INFO:     connection closed
+INFO:     127.0.0.1:56614 - "WebSocket /ws" [accepted]
+INFO:     connection open
+
+==============================================================
+  SELECT PROJECT
+==============================================================
+  Loading projects ...
+  [1] ADL        ASL Data Lake
+  [2] ASL        ASL Integration Framework   (default)
+  [3] PSUD       Process Set up Dummy 
+  [0] Cancel
+==============================================================
+  Select project number (Enter for ASL): 2
+
+  Project set to ASL  (board id 1).
+
+==============================================================
+  ASL AIRLINES  --  ASL WORKFLOW  |  JIRA -> DOC -> DREMIO -> QLIK
+==============================================================
+  [1]  Work on an existing ticket  (browse sprint)
+  [2]  Browse backlog tickets
+  [3]  Create a new ticket
+  [4]  GitHub version control assistant
+  [0]  Exit
+==============================================================
+  Select option: 1
+
+  Loading sprints ... done
+
+==============================================================
+  SELECT SPRINT
+==============================================================
+
+  -- Recent Closed Sprints --
+  [ 1]  ASL IF Sprint 55  [CLOSED]
+  [ 2]  ASL IF Sprint 54  [CLOSED]
+  [ 3]  ASL IF Sprint 53  [CLOSED]
+  [ 4]  ASL IF Sprint 52  [CLOSED]
+  [ 5]  ASL IF Sprint 51  [CLOSED]
+  [ 6]  ASL IF Sprint 50  [CLOSED]
+  [ 7]  ASL IF Sprint 49  [CLOSED]
+  [ 8]  ASL IF Sprint 48  [CLOSED]
+  [ 9]  ASL IF Sprint 47  [CLOSED]
+  [10]  ASL IF Sprint 46  [CLOSED]
+  [ 0]  Back
+==============================================================
+  Select sprint number: INFO:     127.0.0.1:54049 - "GET / HTTP/1.1" 200 OK
+UI disconnected.
+INFO:     connection closed
+INFO:     127.0.0.1:54103 - "WebSocket /ws" [accepted]
+INFO:     connection open
+
+==============================================================
+  SELECT PROJECT
+==============================================================
+  Loading projects ...
+INFO:     127.0.0.1:54050 - "GET / HTTP/1.1" 200 OK
+UI disconnected.
+INFO:     connection closed
+  [1] ADL        ASL Data Lake
+  [2] ASL        ASL Integration Framework   (default)
+  [3] PSUD       Process Set up Dummy 
+  [0] Cancel
+==============================================================
+INFO:     127.0.0.1:54198 - "WebSocket /ws" [accepted]
+INFO:     connection open
+  Select project number (Enter for ASL): 
+==============================================================
+  SELECT PROJECT
+==============================================================
+  Loading projects ...
+  [1] ADL        ASL Data Lake
+  [2] ASL        ASL Integration Framework   (default)
+  [3] PSUD       Process Set up Dummy 
+  [0] Cancel
+==============================================================
+  Select project number (Enter for ASL): 2
+
+  Project set to ASL  (board id 1).
+
+==============================================================
+  ASL AIRLINES  --  ASL WORKFLOW  |  JIRA -> DOC -> DREMIO -> QLIK
+==============================================================
+  [1]  Work on an existing ticket  (browse sprint)
+  [2]  Browse backlog tickets
+  [3]  Create a new ticket
+  [4]  GitHub version control assistant
+  [0]  Exit
+==============================================================
+  Select option: 1
+
+  Loading sprints ... done
+
+==============================================================
+  SELECT SPRINT
+==============================================================
+
+  -- Recent Closed Sprints --
+  [ 1]  ASL IF Sprint 55  [CLOSED]
+  [ 2]  ASL IF Sprint 54  [CLOSED]
+  [ 3]  ASL IF Sprint 53  [CLOSED]
+  [ 4]  ASL IF Sprint 52  [CLOSED]
+  [ 5]  ASL IF Sprint 51  [CLOSED]
+  [ 6]  ASL IF Sprint 50  [CLOSED]
+  [ 7]  ASL IF Sprint 49  [CLOSED]
+  [ 8]  ASL IF Sprint 48  [CLOSED]
+  [ 9]  ASL IF Sprint 47  [CLOSED]
+  [10]  ASL IF Sprint 46  [CLOSED]
+  [ 0]  Back
+==============================================================
+  Select sprint number: 0
+  Cancelled.
+INFO:     127.0.0.1:53563 - "GET / HTTP/1.1" 200 OK
+UI disconnected.
+INFO:     connection closed
+INFO:     127.0.0.1:53623 - "WebSocket /ws" [accepted]
+INFO:     connection open
+ skipped.
+  [Git] Not a git repository; skipping version check.
+
+
+==============================================================
+  WORKFLOW COMPLETE
+==============================================================
+  Ticket  : ADL-1700
+==============================================================
