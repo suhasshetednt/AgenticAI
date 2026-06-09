@@ -489,8 +489,12 @@ const App = () => {
         ro.observe(termBodyRef.current);
         return () => ro.disconnect();
     }, []);
-    // Auto-scroll to bottom whenever active session or prompt changes
-    useEffect(()=>{ termEndRef.current?.scrollIntoView({behavior:'smooth'}); }, [current,prompt]);
+    // Auto-scroll to bottom (vertical only); keep horizontal scroll pinned left.
+    // scrollIntoView was centering the view horizontally — use manual scroll instead.
+    useEffect(()=>{
+        const b = termBodyRef.current;
+        if (b) { b.scrollTop = b.scrollHeight; b.scrollLeft = 0; }
+    }, [current,prompt]);
 
     const addLine   = t => setCurrent(p=>[...p,t]);
     const upNode    = (id,u)  => setNodes(ns=>ns.map(n=>n.id===id?{...n,...u}:n));
@@ -815,7 +819,7 @@ const App = () => {
                 </div>
 
                 {/* Terminal body */}
-                <div ref={termBodyRef} style={{flex:1,overflowY:'auto',overflowX:'auto',padding:'0 12px 12px',display:'flex',flexDirection:'column'}}>
+                <div ref={termBodyRef} style={{flex:1,overflowY:'auto',overflowX:'auto',padding:'0 12px 12px',display:'flex',flexDirection:'column',alignItems:'flex-start'}}>
 
                     {/* ── HISTORY: past sessions pushed into scrollback ── */}
                     {history.map((session,si)=>(
