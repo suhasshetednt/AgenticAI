@@ -918,10 +918,32 @@ def _fix_reserved_keywords(sql: str) -> str:
             return f"{prefix}\"{word}\""
         return str(m.group(0))
 
+    def _quote_bare(m: re.Match[str]) -> str:
+        lead, ws1, word, ws2 = (
+            str(m.group(1)), str(m.group(2)), str(m.group(3)), str(m.group(4)),
+        )
+        if word.lower() in _DREMIO_RESERVED:
+            return f'{lead}{ws1}"{word}"{ws2}'
+        return str(m.group(0))
+
     # AS value  (not already quoted)
     sql = re.sub(r"\b(AS)\s+([A-Za-z_]\w*)\b", _quote_alias, sql, flags=re.IGNORECASE)
     # table.value  (not already quoted — regex won't match ."word" since " is not [A-Za-z_])
     sql = re.sub(r"(\.)([A-Za-z_]\w*)\b", _quote_dot_ref, sql)
+    # Bare reserved word standing alone as a select-list / function-arg item, where
+    # the item is delimited by ',' '(' or SELECT before and ',' or ')' after.
+    #   SELECT a, value, b  |  COUNT(value)  ->  quote
+    sql = re.sub(
+        r"([,(]|\bSELECT\b)(\s*)([A-Za-z_]\w*)(\s*)(?=[,)])",
+        _quote_bare, sql, flags=re.IGNORECASE,
+    )
+    # Bare reserved word as the last select item before FROM. Lead is restricted to
+    # ',' or SELECT (never '(') so EXTRACT(YEAR FROM ...) / SUBSTRING(x FROM ...) and
+    # other "<keyword> FROM" function syntaxes are left untouched.
+    sql = re.sub(
+        r"([,]|\bSELECT\b)(\s*)([A-Za-z_]\w*)(\s*)(?=\bFROM\b)",
+        _quote_bare, sql, flags=re.IGNORECASE,
+    )
     return sql
 
 

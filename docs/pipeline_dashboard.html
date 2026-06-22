@@ -52,6 +52,10 @@
         .turb-blades.t-idle    { animation: turb-spin 5s  linear infinite; }
         @keyframes turb-spin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
 
+        /* ── AGENT AURA (CSS-driven; replaces missing Framer Motion) ── */
+        @keyframes robot-float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-12px)} }
+        @keyframes aura-pulse  { 0%,100%{filter:var(--f-lo)} 50%{filter:var(--f-hi)} }
+
         .turb-btn { background:transparent; border:none; cursor:pointer; outline:none; border-radius:50%; padding:6px; transition:transform .3s; display:block; }
         .turb-btn:hover:not(:disabled) { transform:scale(1.05); }
         .turb-btn:disabled { cursor:not-allowed; }
@@ -353,27 +357,27 @@ const AgentRobot = ({node, isSelected}) => {
     return (
         <div style={{position:'relative', display:'flex', flexDirection:'column', alignItems:'center', width:128}}>
 
-            {/* ── AURA: robot silhouette glow via drop-shadow filter ── */}
+            {/* ── AURA: robot silhouette glow via drop-shadow filter (CSS-driven) ── */}
+            {(() => {
+                const pulsing = isRunning||isHealing||isBlinking;
+                const fLo = (isRunning||isHealing)
+                    ? `drop-shadow(0 0 4px ${pc}aa) drop-shadow(0 0 14px ${pc}55)`
+                    : `drop-shadow(0 0 4px ${pc}88) drop-shadow(0 0 12px ${pc}33)`;
+                const fHi = (isRunning||isHealing)
+                    ? `drop-shadow(0 0 14px ${pc}) drop-shadow(0 0 32px ${pc}99) drop-shadow(0 0 56px ${pc}44)`
+                    : `drop-shadow(0 0 22px ${pc}) drop-shadow(0 0 44px ${pc}bb) drop-shadow(0 0 72px ${pc}55)`;
+                const staticFilter = isDone
+                    ? `drop-shadow(0 0 8px ${pc}99) drop-shadow(0 0 18px ${pc}44)`
+                    : isSelected ? `drop-shadow(0 0 12px ${pc}88) drop-shadow(0 0 28px ${pc}44)` : 'none';
+                const pulseDur = (isRunning||isHealing) ? '1.6s' : '0.55s';
+                return (
             <div
-                animate={{
-                    y:[0,-12,0],
-                    filter:(isRunning||isHealing)?[
-                        `drop-shadow(0 0 4px ${pc}aa) drop-shadow(0 0 14px ${pc}55)`,
-                        `drop-shadow(0 0 14px ${pc}) drop-shadow(0 0 32px ${pc}99) drop-shadow(0 0 56px ${pc}44)`,
-                        `drop-shadow(0 0 4px ${pc}aa) drop-shadow(0 0 14px ${pc}55)`,
-                    ]:isBlinking?[
-                        `drop-shadow(0 0 4px ${pc}88) drop-shadow(0 0 12px ${pc}33)`,
-                        `drop-shadow(0 0 22px ${pc}) drop-shadow(0 0 44px ${pc}bb) drop-shadow(0 0 72px ${pc}55)`,
-                        `drop-shadow(0 0 4px ${pc}88) drop-shadow(0 0 12px ${pc}33)`,
-                    ]:isDone?`drop-shadow(0 0 8px ${pc}99) drop-shadow(0 0 18px ${pc}44)`:
-                      isSelected?`drop-shadow(0 0 12px ${pc}88) drop-shadow(0 0 28px ${pc}44)`:'none',
-                }}
-                transition={{
-                    y:{duration:3.5,repeat:Infinity,ease:'easeInOut'},
-                    filter:(isRunning||isHealing)?{duration:1.6,repeat:Infinity,ease:'easeInOut'}:
-                           isBlinking?{duration:0.55,repeat:Infinity,ease:'easeInOut'}:{duration:0.4},
-                }}
-                style={{position:'relative',zIndex:1,width:96,display:'flex',flexDirection:'column',alignItems:'center'}}
+                style={{position:'relative',zIndex:1,width:96,display:'flex',flexDirection:'column',alignItems:'center',
+                    '--f-lo':fLo,'--f-hi':fHi,
+                    filter: pulsing ? undefined : staticFilter,
+                    animation: pulsing
+                        ? `robot-float 3.5s ease-in-out infinite, aura-pulse ${pulseDur} ease-in-out infinite`
+                        : 'robot-float 3.5s ease-in-out infinite'}}
             >
                 {/* Antenna */}
                 <div style={{width:4,height:16,background:'#475569',borderRadius:'2px 2px 0 0',position:'relative',zIndex:0}}>
@@ -436,6 +440,8 @@ const AgentRobot = ({node, isSelected}) => {
                     style={{width:24,borderRadius:'0 0 9999px 9999px',background:`linear-gradient(to bottom, ${pc}, transparent)`,filter:'blur(3px)',marginTop:-4}}
                 />
             </div>
+                );
+            })()}
 
             {/* Label */}
             <div style={{marginTop:24,display:'flex',flexDirection:'column',alignItems:'center',zIndex:10}}>
