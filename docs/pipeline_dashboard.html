@@ -27,7 +27,9 @@
         }
     </script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&family=Orbitron:wght@400;600;700&display=swap" rel="stylesheet">
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://unpkg.com/react@18.2.0/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18.2.0/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone@7.23.5/babel.min.js"></script>
     <style>
         body { background-color: #050505; color: #ededed; overflow: hidden; margin: 0; }
         .glass { background: rgba(17, 17, 17, 0.6); backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.08); }
@@ -138,21 +140,8 @@
 <body>
 <div id="root"></div>
 
-<script type="importmap">
-{
-    "imports": {
-        "react": "https://esm.sh/react@18.2.0",
-        "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
-        "framer-motion": "https://esm.sh/framer-motion@10.16.4?deps=react@18.2.0,react-dom@18.2.0",
-        "lucide-react": "https://esm.sh/lucide-react@0.292.0?deps=react@18.2.0"
-    }
-}
-</script>
-<script type="text/babel" data-type="module">
-import React,{useState,useEffect,useRef}from'react';
-import{createRoot}from'react-dom/client';
-import{motion}from'framer-motion';
-import{Activity,RefreshCw}from'lucide-react';
+<script type="text/babel">
+const { useState, useEffect, useRef, useCallback } = React;
 
 // ─── NODE LAYOUT — pentagon mesh (5 nodes, fully connected) ──────────────────
 // Centre (480, 490), radius 300. Flow order: jira(top)→doc(TL)→dremio(BL)→qlik(BR)→git(TR)
@@ -365,7 +354,7 @@ const AgentRobot = ({node, isSelected}) => {
         <div style={{position:'relative', display:'flex', flexDirection:'column', alignItems:'center', width:128}}>
 
             {/* ── AURA: robot silhouette glow via drop-shadow filter ── */}
-            <motion.div
+            <div
                 animate={{
                     y:[0,-12,0],
                     filter:(isRunning||isHealing)?[
@@ -388,12 +377,12 @@ const AgentRobot = ({node, isSelected}) => {
             >
                 {/* Antenna */}
                 <div style={{width:4,height:16,background:'#475569',borderRadius:'2px 2px 0 0',position:'relative',zIndex:0}}>
-                    <motion.div animate={{opacity:[0.3,1,0.3]}} transition={{duration:1.5,repeat:Infinity}}
+                    <div animate={{opacity:[0.3,1,0.3]}} transition={{duration:1.5,repeat:Infinity}}
                         style={{position:'absolute',top:-8,left:-4,width:12,height:12,borderRadius:'50%',background:pc,boxShadow:`0 0 10px ${pc}`}}/>
                 </div>
 
                 {/* Head */}
-                <motion.div
+                <div
                     animate={isRunning?{rotateY:[-10,10,-10]}:{}}
                     transition={{duration:2,repeat:Infinity,ease:'easeInOut'}}
                     className={`bg-gradient-to-b ${node.theme} rounded-[20px] border-b-4 border-black/30 shadow-[0_5px_15px_rgba(0,0,0,0.5)] z-10 flex items-center justify-center`}
@@ -401,13 +390,13 @@ const AgentRobot = ({node, isSelected}) => {
                 >
                     <div style={{width:48,height:20,background:'#0f172a',borderRadius:9999,display:'flex',alignItems:'center',justifyContent:'center',overflow:'hidden',border:'1px solid #334155',boxShadow:'inset 0 2px 4px rgba(0,0,0,0.5)'}}>
                         {isRunning ? (
-                            <motion.div animate={{x:[-12,12,-12]}} transition={{duration:1.5,repeat:Infinity,ease:'linear'}}
+                            <div animate={{x:[-12,12,-12]}} transition={{duration:1.5,repeat:Infinity,ease:'linear'}}
                                 style={{width:16,height:8,borderRadius:9999,background:pc,boxShadow:`0 0 10px ${pc}`}}/>
                         ) : isBlinking ? (
-                            <motion.div animate={{opacity:[1,0,1]}} transition={{duration:0.55,repeat:Infinity}}
+                            <div animate={{opacity:[1,0,1]}} transition={{duration:0.55,repeat:Infinity}}
                                 style={{width:16,height:8,borderRadius:9999,background:pc,boxShadow:`0 0 14px ${pc}`}}/>
                         ) : isHealing ? (
-                            <motion.div animate={{rotate:360}} transition={{duration:2,repeat:Infinity,ease:'linear'}}
+                            <div animate={{rotate:360}} transition={{duration:2,repeat:Infinity,ease:'linear'}}
                                 style={{width:12,height:12,borderRadius:'50%',border:`2px dashed ${pc}`}}/>
                         ) : (
                             <div style={{width:24,height:8,display:'flex',justifyContent:'space-between'}}>
@@ -416,7 +405,7 @@ const AgentRobot = ({node, isSelected}) => {
                             </div>
                         )}
                     </div>
-                </motion.div>
+                </div>
 
                 {/* Neck */}
                 <div style={{width:16,height:8,background:'#475569',zIndex:0}}/>
@@ -427,26 +416,26 @@ const AgentRobot = ({node, isSelected}) => {
                     {/* Icon */}
                     <div style={{width:48,height:48,background:'#0f172a',borderRadius:'50%',display:'flex',alignItems:'center',justifyContent:'center',overflow:'hidden',position:'relative',border:`2px solid ${pc}`,boxShadow:`inset 0 0 15px ${pc}40`}}>
                         <img src={node.icon} alt={node.label} style={{width:28,height:28,objectFit:'contain',filter:node.id==='git'?'invert(1)':'none',position:'relative',zIndex:1}}/>
-                        {isRunning && <motion.div animate={{rotate:360}} transition={{duration:3,repeat:Infinity,ease:'linear'}}
+                        {isRunning && <div animate={{rotate:360}} transition={{duration:3,repeat:Infinity,ease:'linear'}}
                             style={{position:'absolute',inset:0,borderRadius:'50%',border:'2px solid transparent',borderTopColor:'rgba(255,255,255,0.3)'}}/>}
                     </div>
                     {/* Arms */}
-                    <motion.div animate={{y:[0,-3,0]}} transition={{duration:2,repeat:Infinity,delay:.2}}
+                    <div animate={{y:[0,-3,0]}} transition={{duration:2,repeat:Infinity,delay:.2}}
                         className={`absolute bg-gradient-to-b ${node.theme} rounded-full shadow-md border-b-2 border-black/30`}
                         style={{left:-12,top:16,width:16,height:40}}/>
-                    <motion.div animate={{y:[0,-3,0]}} transition={{duration:2,repeat:Infinity,delay:.5}}
+                    <div animate={{y:[0,-3,0]}} transition={{duration:2,repeat:Infinity,delay:.5}}
                         className={`absolute bg-gradient-to-b ${node.theme} rounded-full shadow-md border-b-2 border-black/30`}
                         style={{right:-12,top:16,width:16,height:40}}/>
                 </div>
 
                 {/* Thruster */}
                 <div style={{width:32,height:12,background:'#334155',borderRadius:'0 0 8px 8px',zIndex:1}}/>
-                <motion.div
+                <div
                     animate={{height:isRunning?[15,25,15]:[10,15,10], opacity:[0.6,1,0.6]}}
                     transition={{duration:.2,repeat:Infinity}}
                     style={{width:24,borderRadius:'0 0 9999px 9999px',background:`linear-gradient(to bottom, ${pc}, transparent)`,filter:'blur(3px)',marginTop:-4}}
                 />
-            </motion.div>
+            </div>
 
             {/* Label */}
             <div style={{marginTop:24,display:'flex',flexDirection:'column',alignItems:'center',zIndex:10}}>
@@ -593,7 +582,7 @@ const App = () => {
         if (ws.current && ws.current.readyState < 2) ws.current.close();
         console.log('[WS] Connecting...');
         setWsState('connecting');
-        const socket = new WebSocket('ws://localhost:8000/ws');
+        const socket = new WebSocket(`ws://${window.location.host}/ws`);
         ws.current = socket;
         attachWS(socket);
     }, [attachWS]);
@@ -685,7 +674,7 @@ const App = () => {
                             })}
                         </div>
                         <button onClick={()=>window.location.reload()} style={{display:'flex',alignItems:'center',gap:6,fontSize:12,color:'#94a3b8',background:'rgba(255,255,255,0.05)',padding:'6px 12px',borderRadius:6,border:'1px solid rgba(255,255,255,0.1)',cursor:'pointer'}}>
-                            <RefreshCw size={13}/> Restart
+                            <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg> Restart
                         </button>
                     </div>
                 </div>
@@ -711,11 +700,11 @@ const App = () => {
                         </svg>
                         {/* Nodes */}
                         {nodes.map(node=>(
-                            <motion.div key={node.id}
+                            <div key={node.id}
                                 style={{position:'absolute',left:node.x,top:node.y,zIndex:10}}
                                 initial={{opacity:0,scale:.9}} animate={{opacity:1,scale:1}}>
                                 <AgentRobot node={node} isSelected={selectedAgent===node.id&&wsState==='ready_to_start'}/>
-                            </motion.div>
+                            </div>
                         ))}
                     </div>
                 </div>
@@ -763,7 +752,7 @@ const App = () => {
                         </div>
                     )}
 
-                    <motion.button className="turb-btn"
+                    <button className="turb-btn"
                         onClick={()=>{
                             if(wsState==='ready_to_start'){
                                 ws.current.send("START_WORKFLOW");
@@ -788,14 +777,14 @@ const App = () => {
                             opacity:(wsState==='connecting')?0.5:1,
                         }}>
                         <TurbineSVG spinning={isSpinning} idle={wsState==='ready_to_start'}/>
-                    </motion.button>
+                    </button>
 
-                    {isSpinning && <motion.div style={{width:70,height:22,background:'radial-gradient(ellipse,rgba(255,110,0,.5) 0%,transparent 70%)',filter:'blur(6px)',marginTop:-6}}
+                    {isSpinning && <div style={{width:70,height:22,background:'radial-gradient(ellipse,rgba(255,110,0,.5) 0%,transparent 70%)',filter:'blur(6px)',marginTop:-6}}
                         animate={{opacity:[.5,1,.5],scaleY:[1,1.5,1]}} transition={{duration:.15,repeat:Infinity}}/>}
 
                     {/* Status + RPM */}
                     <div style={{display:'flex',alignItems:'center',gap:8,marginTop:10}}>
-                        <motion.div style={{width:8,height:8,borderRadius:'50%',background:isSpinning?'#F97316':wsState==='ready_to_start'?'#00b4ff':'#374151'}}
+                        <div style={{width:8,height:8,borderRadius:'50%',background:isSpinning?'#F97316':wsState==='ready_to_start'?'#00b4ff':'#374151'}}
                             animate={isSpinning?{opacity:[1,.2,1]}:wsState==='ready_to_start'?{opacity:[1,.5,1]}:{}}
                             transition={{duration:isSpinning?.3:2,repeat:Infinity}}/>
                         <span style={{fontFamily:'Orbitron,monospace',fontSize:9,letterSpacing:'2.5px',color:isSpinning?'#F97316':wsState==='ready_to_start'?'#00b4ff':'#374151'}}>
@@ -804,16 +793,15 @@ const App = () => {
                     </div>
                     <div style={{display:'flex',gap:3,marginTop:10}}>
                         {Array.from({length:20}).map((_,i)=>(
-                            <motion.span key={i} className="rpm-bar"
-                                style={{background:isSpinning?(i<10?'#10B981':i<15?'#F59E0B':'#EF4444'):(i<3?'#00b4ff':'rgba(255,255,255,0.07)')}}
-                                animate={isSpinning&&i>=13?{opacity:[1,.3,1]}:{}} transition={{duration:.1+i*.02,repeat:Infinity}}/>
+                            <span key={i} className="rpm-bar"
+                                style={{background:isSpinning?(i<10?'#10B981':i<15?'#F59E0B':'#EF4444'):(i<3?'#00b4ff':'rgba(255,255,255,0.07)')}}/>
                         ))}
                     </div>
                 </div>
 
                 {/* Executive Event Log header */}
                 <div style={{padding:'8px 18px',borderBottom:'1px solid rgba(0,180,255,0.14)',background:'rgba(0,180,255,0.03)',display:'flex',alignItems:'center',gap:8}}>
-                    <Activity size={13} color="#00b4ff"/>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#00b4ff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
                     <span style={{fontFamily:'Orbitron,monospace',fontSize:8,letterSpacing:'3px',textTransform:'uppercase',color:'rgba(0,180,255,0.7)'}}>Executive Event Log</span>
                     <span style={{marginLeft:'auto',fontFamily:'JetBrains Mono',fontSize:10,color:'rgba(0,180,255,0.3)'}}>{history.reduce((s,sess)=>s+sess.length,0)+current.length} LINES</span>
                 </div>
@@ -862,14 +850,14 @@ const App = () => {
 
                         {/* Prompt input */}
                         {prompt && (
-                        <motion.div initial={{opacity:0,y:6}} animate={{opacity:1,y:0}} className="t-prompt-wrap">
+                        <div initial={{opacity:0,y:6}} animate={{opacity:1,y:0}} className="t-prompt-wrap">
                             <span className="t-prompt-text">{prompt}</span>
                             <form style={{flex:1,display:'flex',alignItems:'center',gap:6}} onSubmit={handleSubmit}>
                                 <input autoFocus id="pipeline-prompt" name="pipeline-prompt" autoComplete="off" className="t-prompt-input" value={inputVal}
                                     onChange={e=>setInputVal(e.target.value)} placeholder="input..."/>
                                 <div className="t-cursor"/>
                             </form>
-                        </motion.div>
+                        </div>
                         )}
                         <div ref={termEndRef}/>
                     </div>{/* end active session */}
@@ -885,7 +873,7 @@ const App = () => {
     );
 };
 
-createRoot(document.getElementById('root')).render(<App/>);
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
 </script>
 </body>
 </html>

@@ -29,6 +29,7 @@ def jira_to_context(reqs: Any, sql: str = "", vds_path: str = "") -> DocContext:
             "filter_conditions": list(reqs.filter_conditions),
             "acceptance_criteria": list(reqs.acceptance_criteria),
             "extra_notes": reqs.extra_notes,
+            "join_analysis": getattr(reqs, "join_analysis", ""),
             "sql": sql,
             "vds_path": vds_path,
         },

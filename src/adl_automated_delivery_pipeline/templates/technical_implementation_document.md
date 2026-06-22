@@ -65,6 +65,9 @@ Prepared: {{metadata.prepared}}  |  {{metadata.team}}
 ### 11.3 Access Control
 <!-- one sentence: who has SELECT vs write access to the VDS output -->
 
+### 11.4 VDS Join Analysis
+<!-- if data.join_analysis is non-empty, reproduce it verbatim under this heading; otherwise omit this section -->
+
 ## 12. Sign-off
 <!-- a table with columns Role, Name, Date and rows for Technical Lead, Development Lead, QA/Tester, Business Owner (leave Date blank) -->
 

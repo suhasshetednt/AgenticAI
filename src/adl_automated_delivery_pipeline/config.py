@@ -25,6 +25,7 @@ _SRC_DIR = _PKG_DIR.parent                            # <root>/src
 _ROOT = _SRC_DIR.parent                               # project root
 
 _ENV_CANDIDATES = [
+    _ROOT.parent / ".env",       # E:\LLM\Claude\.env  (workspace-level)
     _ROOT / "config.env",
     _ROOT / ".env",
     _PKG_DIR / "config.env",

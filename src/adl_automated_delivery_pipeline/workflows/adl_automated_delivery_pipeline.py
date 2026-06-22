@@ -47,6 +47,7 @@ PROJECT     = "ADL"
 _BOARD_ID   = 2          # ADL board (simple board, id confirmed)
 _DIV        = "=" * 62
 _OUTPUT_DIR = Path(__file__).resolve().parent.parent.parent.parent / "generated_queries"
+_VDS_JOIN_REF_PATH = Path(__file__).resolve().parents[3] / "dremio_vds_join_reference.md"
 
 
 # ── Self-healing memory ──────────────────────────────────────────────────────────
@@ -540,6 +541,7 @@ class TicketRequirements:
     filter_conditions: list[str]
     acceptance_criteria: list[str]
     extra_notes: str = ""
+    join_analysis: str = ""
     raw_description: str = field(default="", repr=False)
 
 
@@ -713,6 +715,13 @@ def _build_dremio_prompt(reqs: TicketRequirements) -> str:
         schemas_list.append(_get_table_schema(t))
     schemas_txt = "\n\n".join(schemas_list) if schemas_list else "  - (no table schemas available)"
 
+    # Load join reference — sections 2+3 (conventions + inventory) are most useful
+    _raw_ref = _load_vds_join_reference(max_chars=4_000)
+    join_ref_block = f"\n--- EXISTING VDS JOIN REFERENCE (use these patterns/keys) ---\n{_raw_ref}" if _raw_ref else ""
+
+    # Include prior join analysis if available
+    join_analysis_block = f"\n--- JOIN ANALYSIS FROM JIRA PHASE ---\n{reqs.join_analysis}" if reqs.join_analysis else ""
+
     return f"""Generate an optimised Dremio SQL query for the following requirement.
 Apply ALL rules from the query rules document before writing any SQL.
 Do NOT add LIMIT or ORDER BY — this query will be used as a Virtual Dataset definition.
@@ -746,7 +755,7 @@ Example: amos_postgres.amos.rotables_trend  (NEVER amos_acceptance, amos_dev, am
 {filters}
 
 --- ACCEPTANCE CRITERIA ---
-{acceptance}{notes_block}
+{acceptance}{notes_block}{join_ref_block}{join_analysis_block}
 
 Generate the complete, optimised SQL query now.
 Return ONLY the SQL — no explanation before or after.
@@ -935,6 +944,136 @@ def _save_sql(reqs: TicketRequirements, sql: str) -> Path:
         encoding="utf-8",
     )
     return sql_path
+
+
+# ── VDS join reference helpers ──────────────────────────────────────────────────
+
+def _load_vds_join_reference(max_chars: int = 6_000) -> str:
+    """Load dremio_vds_join_reference.md, truncated to max_chars."""
+    if not _VDS_JOIN_REF_PATH.exists():
+        return ""
+    content = _VDS_JOIN_REF_PATH.read_text(encoding="utf-8")
+    if len(content) > max_chars:
+        return content[:max_chars] + "\n\n[... reference truncated ...]"
+    return content
+
+
+def _analyze_join_opportunities(reqs: TicketRequirements) -> str:
+    """Analyze source tables against catalog + join reference; return analysis string.
+
+    Prints suggestions to console and stores them in reqs.join_analysis so the
+    doc agent and Dremio prompt can both consume them.
+    """
+    _header("JOIN ANALYSIS  —  Catalog + VDS Reference")
+    print("  Analyzing source tables against catalog and existing VDS join reference ...")
+
+    ref = _load_vds_join_reference(max_chars=5_000)
+    if not ref:
+        print("  (dremio_vds_join_reference.md not found — skipping)")
+        return ""
+
+    schemas_list = [_get_table_schema(t) for t in reqs.source_tables]
+    schemas_txt = "\n\n".join(schemas_list) if schemas_list else "(no schemas available)"
+    tables_txt = ", ".join(reqs.source_tables) or "(none specified)"
+
+    prompt = (
+        f"You are a Dremio SQL architect for ASL Airlines.\n\n"
+        f"TICKET: {reqs.ticket_id} — {reqs.summary}\n"
+        f"REQUIREMENT: {reqs.business_requirement}\n\n"
+        f"SOURCE TABLES:\n{tables_txt}\n\n"
+        f"TABLE SCHEMAS (from catalog):\n{schemas_txt}\n\n"
+        f"EXISTING VDS JOIN REFERENCE:\n{ref}\n\n"
+        f"TASKS — answer all three:\n"
+        f"1. EXISTING VDS REUSE: Which existing VDSs in the reference already join these "
+        f"tables? Can the new query extend or UPDATE one instead of creating from scratch?\n"
+        f"2. SUGGESTED JOIN STRATEGY: Best join keys, join types, grain and pre-filter "
+        f"patterns for the new/updated VDS (reference §2 conventions).\n"
+        f"3. RISKS: Fan-out risks, INNER vs LEFT gotchas, reserved column names.\n\n"
+        f"Format: use numbered sections matching above. Be concise — max 350 words total."
+    )
+
+    _retry_delays = [65, 65]
+    for _att, _dly in enumerate(_retry_delays, start=1):
+        try:
+            llm = get_llm()
+            resp = llm.invoke([
+                SystemMessage(content="You are a Dremio SQL architect. Be concise and actionable."),
+                HumanMessage(content=prompt),
+            ])
+            analysis = str(resp.content).strip()
+            print(f"\n{analysis}\n")
+            print(_DIV)
+            reqs.join_analysis = analysis
+            return analysis
+        except Exception as exc:
+            err = str(exc)
+            if ("rate_limit" in err.lower() or "429" in err) and _att <= len(_retry_delays):
+                print(f"\n  Rate limited — waiting {_dly}s ...")
+                time.sleep(_dly)
+            else:
+                print(f"\n  WARNING: Join analysis failed: {exc}")
+                return ""
+    return ""
+
+
+def _update_vds_join_reference(
+    ticket_id: str,
+    summary: str,
+    vds_path: str,
+    sql: str,
+    action: str = "created",
+) -> None:
+    """Append a documented entry for the new/updated VDS to dremio_vds_join_reference.md."""
+    if not sql.strip() or not _VDS_JOIN_REF_PATH.exists():
+        return
+
+    print(f"\n  Updating dremio_vds_join_reference.md for {vds_path} ...")
+
+    prompt = (
+        f"You are documenting a Dremio VDS for the dremio_vds_join_reference.md catalog.\n\n"
+        f"Action   : {action}\n"
+        f"Ticket   : {ticket_id} — {summary}\n"
+        f"VDS path : {vds_path}\n\n"
+        f"SQL:\n{sql[:3_000]}\n\n"
+        f"Generate a compact documentation entry using EXACTLY this template:\n\n"
+        f"#### `{vds_path}`  ✅\n"
+        f"- **Purpose:** <one sentence>\n"
+        f"- **Grain:** <one sentence — what makes a row unique>\n"
+        f"- **Source tables:** <comma-separated fully-qualified table names>\n"
+        f"- **Join map:**\n"
+        f"  - <LEFT_TABLE alias>  <JOIN TYPE>  <RIGHT_TABLE alias>  ON <key(s)>\n"
+        f"- **Filters / logic:** <key WHERE conditions and business rules>\n"
+        f"- **Build notes:** <important notes for future modifications>\n\n"
+        f"Return ONLY the documentation block — no markdown fences, no extra text."
+    )
+
+    _retry_delays = [65, 65]
+    for _att, _dly in enumerate(_retry_delays, start=1):
+        try:
+            llm = get_llm()
+            resp = llm.invoke([
+                SystemMessage(content="You are a precise technical writer documenting Dremio VDSs."),
+                HumanMessage(content=prompt),
+            ])
+            entry = str(resp.content).strip()
+            ts = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+            existing = _VDS_JOIN_REF_PATH.read_text(encoding="utf-8")
+            addition = (
+                f"\n\n---\n\n"
+                f"### {action.capitalize()} via workflow — {ts}  ({ticket_id})\n\n"
+                f"{entry}\n"
+            )
+            _VDS_JOIN_REF_PATH.write_text(existing + addition, encoding="utf-8")
+            print(f"  dremio_vds_join_reference.md updated.")
+            return
+        except Exception as exc:
+            err = str(exc)
+            if ("rate_limit" in err.lower() or "429" in err) and _att <= len(_retry_delays):
+                print(f"\n  Rate limited — waiting {_dly}s ...")
+                time.sleep(_dly)
+            else:
+                print(f"  WARNING: Could not update VDS join reference: {exc}")
+                return
 
 
 # ── Documentation Agent phase ───────────────────────────────────────────────────
@@ -1204,10 +1343,12 @@ def _read_vds_sql(vds_path: str) -> str:
 
 
 def _llm_rewrite_sql(existing_sql: str, instructions: str, rules: str) -> str:
+    _join_ref = _load_vds_join_reference(max_chars=3_000)
+    join_ref_section = f"\n\nEXISTING VDS JOIN REFERENCE (for cross-referencing join keys/grain):\n{_join_ref}" if _join_ref else ""
     prompt = (
         f"You are a Dremio SQL expert. Modify the following SQL according to these instructions:\n\n"
         f"INSTRUCTIONS:\n{instructions}\n\n"
-        f"EXISTING SQL:\n{existing_sql}\n"
+        f"EXISTING SQL:\n{existing_sql}{join_ref_section}\n"
     )
     _llm = get_llm()
     _resp = _llm.invoke([
@@ -1222,34 +1363,216 @@ def _llm_rewrite_sql(existing_sql: str, instructions: str, rules: str) -> str:
     return sql
 
 
+def _build_smart_update_instructions(
+    reqs: TicketRequirements,
+    existing_sql: str,
+    rules: str,
+) -> str:
+    """Auto-derive full update instructions from ticket reqs + catalog + join reference.
+
+    Returns a production-ready updated SQL string.
+    """
+    # Catalog schemas for every source table mentioned in the ticket
+    schemas_list = [_get_table_schema(t) for t in reqs.source_tables]
+    schemas_txt = "\n\n".join(schemas_list) if schemas_list else "(no schemas available)"
+
+    fields_txt = "\n".join(
+        f"  - {f['name']}: {f.get('description', '')}" for f in reqs.output_fields
+    ) or "  (not specified)"
+    transforms_txt = "\n".join(f"  - {t}" for t in reqs.transformations) or "  (none)"
+    filters_txt = "\n".join(f"  - {c}" for c in reqs.filter_conditions) or "  (none)"
+
+    join_ref = _load_vds_join_reference(max_chars=5_000)
+    join_ref_block = f"\n\n--- VDS JOIN REFERENCE (existing join patterns / keys) ---\n{join_ref}" if join_ref else ""
+    join_analysis_block = f"\n\n--- PRIOR JOIN ANALYSIS ---\n{reqs.join_analysis}" if reqs.join_analysis else ""
+
+    prompt = f"""You are a Dremio SQL expert for ASL Airlines.
+
+Your task: UPDATE the existing VDS SQL below to incorporate the new requirements from Jira ticket {reqs.ticket_id}.
+
+=== EXISTING VDS SQL ===
+{existing_sql}
+
+=== JIRA TICKET REQUIREMENT ===
+Ticket  : {reqs.ticket_id} — {reqs.summary}
+Goal    : {reqs.business_requirement}
+
+=== NEW COLUMNS / FIELDS TO ADD ===
+{fields_txt}
+
+=== TABLES INVOLVED (catalog schemas) ===
+{schemas_txt}
+
+=== TRANSFORMATION RULES ===
+{transforms_txt}
+
+=== FILTER CONDITIONS ===
+{filters_txt}{join_ref_block}{join_analysis_block}
+
+=== INSTRUCTIONS ===
+1. Keep ALL existing columns and joins intact — do not remove or rename anything already working.
+2. Add the new columns listed above by joining the required tables using the correct keys from the catalog schemas and join reference.
+3. Use LEFT JOIN for all new joins to preserve existing grain — never INNER unless the business rule explicitly requires it.
+4. Apply ALL Dremio/Calcite rules: no trailing semicolons, no ORDER BY or LIMIT in VDS definitions, quote reserved words.
+5. Fix the AMOS source prefix if needed: always amos_postgres.amos.<table>
+6. Return a single, complete, production-ready SQL query.
+Return ONLY the SQL — no explanation, no markdown fences.
+"""
+
+    _retry_delays = [65, 65]
+    for _att, _dly in enumerate(_retry_delays, start=1):
+        try:
+            llm = get_llm()
+            resp = llm.invoke([
+                SystemMessage(content=(
+                    "You are a Dremio SQL expert. Return ONLY the complete updated SQL query.\n\n"
+                    f"QUERY RULES (apply all):\n{rules}"
+                )),
+                HumanMessage(content=prompt),
+            ])
+            raw = str(resp.content) if hasattr(resp, "content") else str(resp)
+            return _fix_dremio_sql(_fix_reserved_keywords(_remove_semicolons(_strip_fences(raw.strip()))))
+        except Exception as exc:
+            err = str(exc)
+            if ("rate_limit" in err.lower() or "429" in err) and _att <= len(_retry_delays):
+                print(f"\n  Rate limited — waiting {_dly}s ...")
+                time.sleep(_dly)
+            else:
+                raise
+    return ""
+
+
 def _update_vds_interactive(reqs: TicketRequirements | None) -> str:
     vds_info = _pick_existing_vds()
     if not vds_info:
         return ""
     space, folder, vds_name, vds_path, vds_id = vds_info
-    
+
     print(f"\n  Fetching SQL for {vds_path}...")
     existing_sql = _read_vds_sql(vds_path)
     if not existing_sql:
         print("  Failed to fetch or find SQL for this VDS.")
         return ""
-        
+
     print("\n" + _DIV)
     print("EXISTING SQL:")
     print(existing_sql)
     print(_DIV + "\n")
-    
-    edit = _inp("Edit this query? [y/n]: ", required=False)
-    if edit.lower() not in ("y", "yes"):
-        return ""
-        
+
     _rules_path = Path(__file__).resolve().parent.parent / "rules" / "dremio_query_rules.md"
     _rules = _rules_path.read_text(encoding="utf-8")[:6_000] if _rules_path.exists() else ""
-    
+
     current_sql = existing_sql
     from adl_automated_delivery_pipeline.tools.dremio_tools import validate_sql_query, create_virtual_dataset, execute_dremio_sql, create_dremio_folder
     from adl_automated_delivery_pipeline.audit import AuditLogger
-    
+
+    # ── Smart auto-update from ticket requirements ────────────────────────────
+    if reqs:
+        _header("AUTO-GENERATING UPDATE  —  Ticket + Catalog + Join Reference")
+        print(f"  Ticket   : {reqs.ticket_id} — {reqs.summary}")
+        print(f"  New cols : {', '.join(f['name'] for f in reqs.output_fields) or '(see transformations)'}")
+        print(f"  Tables   : {', '.join(reqs.source_tables) or '(see ticket)'}")
+        print(f"\n  Reading catalog schemas + VDS join reference ...")
+        print(f"  Generating production-ready updated SQL ...\n")
+        new_sql = _build_smart_update_instructions(reqs, existing_sql, _rules)
+        if not new_sql:
+            print("  Auto-generation failed — falling back to manual mode.\n")
+        else:
+            print("\n" + _DIV)
+            print("UPDATED SQL (auto-generated from ticket requirements):")
+            print(new_sql)
+            print(_DIV + "\n")
+
+            catalog_issues = _validate_columns_against_catalog(new_sql)
+            if catalog_issues:
+                print("  CATALOG WARNINGS:")
+                for issue in catalog_issues:
+                    print(f"  ⚠  {issue}")
+                print()
+
+            print("  [1] Accept and deploy to Dremio")
+            print("  [2] Refine with additional instructions")
+            print("  [3] Switch to manual mode")
+            print("  [4] Cancel")
+            print(_DIV)
+            sub = _inp("Select [1/2/3/4]: ")
+            if sub == "4":
+                print("  Cancelled.")
+                return ""
+            elif sub == "3":
+                pass  # fall through to manual loop below
+            elif sub == "2":
+                current_sql = new_sql
+                # fall through to refinement loop
+            elif sub == "1":
+                current_sql = new_sql
+                # jump straight to deploy — skip the manual loop
+                # Validate + deploy block is handled after the while loop via a flag
+                _deploy_sql = current_sql
+                _do_deploy = True
+                # inline deploy
+                if reqs:
+                    sql_file = _save_sql(reqs, _deploy_sql)
+                    print(f"\n  SQL saved locally: {sql_file}")
+                print("  Validating SQL ...")
+                val = cast(Any, validate_sql_query).invoke({"sql": _deploy_sql})
+                if val.get("status") != "SUCCESS":
+                    print(f"\n  Validation FAILED: {val.get('error', val)}")
+                    print("  Dropping back to refinement loop.\n")
+                    current_sql = _deploy_sql
+                else:
+                    print("  SQL validated OK.")
+                    action = _inp("\n  Before replacing, do you want to [b]ackup, [d]elete, or [c]ancel? [b/d/c]: ")
+                    if action.lower() in ("b", "backup"):
+                        from datetime import datetime as _dt
+                        ts = _dt.now().strftime("%Y%m%d_%H%M%S")
+                        backup_name = f"{vds_name}_{ts}"
+                        backup_folder = f"{folder}/backup" if folder else "backup"
+                        create_dremio_folder(space=space, folder_path=backup_folder)
+                        res_bak = cast(Any, create_virtual_dataset).invoke({
+                            "space": space, "folder_path": backup_folder,
+                            "vds_name": backup_name, "sql": existing_sql,
+                        })
+                        if res_bak.get("status") == "SUCCESS":
+                            print(f"  Backup created: {backup_name}")
+                            cast(Any, execute_dremio_sql).invoke({"sql": f'DROP VIEW {_quote_dremio_path(space, folder, vds_name)}'})
+                        else:
+                            print(f"  Backup failed: {res_bak.get('error')}. Aborting.")
+                            return ""
+                    elif action.lower() in ("d", "delete"):
+                        cast(Any, execute_dremio_sql).invoke({"sql": f'DROP VIEW {_quote_dremio_path(space, folder, vds_name)}'})
+                        print("  Old VDS deleted.")
+                    else:
+                        print("  Cancelled.")
+                        return ""
+                    cres = cast(Any, create_virtual_dataset).invoke({
+                        "space": space, "folder_path": folder,
+                        "vds_name": vds_name, "sql": _deploy_sql,
+                    })
+                    if cres.get("status") == "SUCCESS":
+                        print(f"  VDS updated successfully!\n  Path: {cres.get('vds_path')}\n")
+                        _update_vds_join_reference(
+                            reqs.ticket_id if reqs else "unknown",
+                            reqs.summary if reqs else vds_path,
+                            vds_path, _deploy_sql, action="updated",
+                        )
+                        AuditLogger.log_action(
+                            trace_id="interactive", session_id=reqs.ticket_id if reqs else "unknown",
+                            agent="dremio_agent", action="Update VDS (smart)", user_id="cli",
+                            role="operator", project_key=(reqs.ticket_id.split("-")[0] if reqs else "ADL"),
+                            input_summary=f"Auto-updated {vds_path} from {reqs.ticket_id if reqs else ''}",
+                            output_summary="Ticket+catalog+join-ref used to auto-generate update.",
+                        )
+                        return vds_path
+                    else:
+                        print(f"\n  VDS creation FAILED: {cres.get('error', cres)}\n")
+                        return ""
+
+    else:
+        edit = _inp("Edit this query? [y/n]: ", required=False)
+        if edit.lower() not in ("y", "yes"):
+            return ""
+
     while True:
         instructions = _inp("\nDescribe what needs to change in plain English:\n  > ")
         print("  Generating updated SQL...")
@@ -1327,7 +1650,11 @@ def _update_vds_interactive(reqs: TicketRequirements | None) -> str:
                 print("  VDS updated successfully!")
                 print(f"  ID  : {cres.get('vds_id')}")
                 print(f"  Path: {cres.get('vds_path')}\n")
-                
+                _update_vds_join_reference(
+                    reqs.ticket_id if reqs else "unknown",
+                    reqs.summary if reqs else vds_path,
+                    vds_path, new_sql, action="updated",
+                )
                 AuditLogger.log_action(
                     trace_id="interactive",
                     session_id=reqs.ticket_id if reqs else "unknown",
@@ -1553,6 +1880,10 @@ def _dremio_phase(reqs: TicketRequirements | None) -> str:
                                         print(f"  VDS created successfully!")
                                         print(f"  ID  : {cres.get('vds_id')}")
                                         print(f"  Path: {cres.get('vds_path')}\n")
+                                        _update_vds_join_reference(
+                                            reqs.ticket_id, reqs.summary,
+                                            approved_vds_path, sql, action="created",
+                                        )
                                         return approved_vds_path
                                     else:
                                         print(f"\n  VDS creation FAILED:")
@@ -1991,6 +2322,7 @@ def run_ticket(key: str, start_at: str = "jira") -> None:
         ev.done()
         return
     _display_requirements(reqs)
+    _analyze_join_opportunities(reqs)
     ev.stage("reqs", "done")
 
     ev.stage("doc", "start")
@@ -2114,6 +2446,7 @@ def main() -> None:
                 print("  Could not extract requirements.")
                 continue
             _display_requirements(reqs)
+            _analyze_join_opportunities(reqs)
 
             confirm = _inp("Proceed to Documentation + Dremio Agent? [y/n]: ")
             if confirm.lower() not in ("y", "yes"):
@@ -2158,6 +2491,7 @@ def main() -> None:
                 print("  Could not extract requirements.")
                 continue
             _display_requirements(reqs)
+            _analyze_join_opportunities(reqs)
 
             confirm = _inp("Proceed to Documentation + Dremio Agent? [y/n]: ")
             if confirm.lower() not in ("y", "yes"):
@@ -2172,6 +2506,7 @@ def main() -> None:
             if not reqs:
                 continue
             _display_requirements(reqs)
+            _analyze_join_opportunities(reqs)
             confirm = _inp("Proceed to Documentation + Dremio Agent? [y/n]: ")
             if confirm.lower() not in ("y", "yes"):
                 continue
