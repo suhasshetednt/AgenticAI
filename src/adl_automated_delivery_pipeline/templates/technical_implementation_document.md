@@ -39,7 +39,13 @@ Prepared: {{metadata.prepared}}  |  {{metadata.team}}
 | Table Name | Full Path | Description |
 |------------|-----------|-------------|
 
-### 8.2 Interface Process
+### 8.2 Logical Diagram
+<!-- one sentence introducing the logical data-flow (source tables through transformation to the VDS output); the diagram itself is generated automatically below this line -->
+
+### 8.3 Technical Diagram
+<!-- one sentence introducing the technical architecture (source system through Dremio Cloud to the consuming dashboards); the diagram itself is generated automatically below this line -->
+
+### 8.4 Interface Process
 <!-- for each VDS/component, a short heading then bullet steps describing select, joins, filters, output naming, grounded in data.transformations and data.filter_conditions -->
 
 ## 9. Data Dictionary

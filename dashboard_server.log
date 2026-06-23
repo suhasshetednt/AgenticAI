@@ -105,3 +105,557 @@ INFO:     connection open
   20  ADL-902   On hold          Med [Eagle Eye] Reflection for technical delay is working sometime and sometimes doesn't
    0   Back
 ==============================================================
+  Select ticket number: 12
+
+==============================================================
+  SELECTED TICKET : ADL-1700
+==============================================================
+  Sprint   : ADL Sprint 49  [ACTIVE]
+  Summary  : [APU Health Monitor] Create query for APU Health Monitor in Engine Folder
+  State    : In Progress
+  Priority : Medium
+  Assignee : Suhas Shete
+==============================================================
+
+  Fetching full ticket details ... done
+
+  Jira Agent analyzing ticket ... done
+
+==============================================================
+  TICKET REQUIREMENTS  (extracted by Jira Agent)
+==============================================================
+  Ticket  : ADL-1700
+  Summary : [APU Health Monitor] Create query for APU Health Monitor in Engine Folder
+
+  Business Requirement:
+    Create a Virtual Data Source (VDS) in the Engine Folder to monitor APU health for B737NG aircraft by extracting APU performance data from AMOS, including part numbers, serial numbers, aircraft registration, and CT5ATP trend values with the latest reference date for each APU.
+
+  Source Database : amos_postgres
+  Source Tables (3):
+    - amos.rotables
+    - amos.rotables_trend
+    - amos.aircraft
+
+  Output Fields (9):
+    - partno: APU Part Number
+    - serialno: APU Serial Number
+    - psn: Unique PSN (Part Serial Number) associated with each APU Serial Number
+    - ac_registr: Aircraft Registration
+    - ref_date: Reference Date converted from integer to date format (latest date only for each APU)
+    - trend_type: Trend Type (CT5)
+    - event_perfno_i: Work Order number if present
+    - value: CT5ATP value representing APU performance metric
+    - ac_typ: Aircraft Type
+
+  Transformations (5):
+    - Convert ref_date from integer (BIGINT) to date format using DATE_ADD function with base date of 1971-12-31
+    - Filter trend_type to uppercase 'CT5' values only
+    - Filter aircraft type to uppercase 'B737NG' only
+    - Rank rotables_trend records by PSN partition ordered by ref_date descending to identify latest record per APU
+    - Select only the latest reference date record for each APU (row number = 1)
+
+  Filters (3):
+    - UPPER(rt.trend_type) = UPPER('CT5')
+    - UPPER(a.ac_typ) = UPPER('B737NG')
+    - rn = 1 (latest record per APU based on ref_date)
+
+  Acceptance Criteria (8):
+    - Query returns only APUs fitted to ASL AC Type B737NG aircraft
+    - Each APU is represented by its latest reference date only
+    - All required fields are present: APU P/n, APU S/n, PSN, Aircraft Reg., Reference Date, CT5 trend type, Workorder, CT5ATP value, and Aircraft Type
+    - Reference dates are properly converted from integer format to readable date format
+    - Trend type is filtered to CT5 values only
+    - VDS is created in the Engine Folder in Dremio
+    - Query handles null workorder values appropriately
+    - Results match the sample output showing 27 rows of B737NG APU health data
+==============================================================
+
+==============================================================
+  JOIN ANALYSIS  �  Catalog + VDS Reference
+==============================================================
+  Analyzing source tables against catalog and existing VDS join reference ...
+
+# ADL-1700 APU Health Monitor VDS � Architecture
+
+## 1. EXISTING VDS REUSE
+
+**No direct reuse candidate found.** The reference catalog does not list a rotables-trend health monitoring VDS. However, the pattern mirrors **aircraft maintenance trend queries** (e.g., engine/component health tracking). 
+
+**Recommendation:** Build new VDS in `Engine` folder. If a generic **Rotables Health Monitor** VDS exists elsewhere (not in reference excerpt), check whether APU is a specialization of it before duplicating.
+
+---
+
+## 2. SUGGESTED JOIN STRATEGY
+
+**Grain:** One row per APU (rotable) per latest trend reference date.
+
+**Join map:**
+```
+amos.rotables (APU parts only)
+  INNER JOIN amos.aircraft 
+    ON rotables.ac_registr = aircraft.ac_registr
+  LEFT JOIN amos.rotables_trend (CT5ATP only, latest ref_date per PSN)
+    ON rotables.psn = rotables_trend.psn
+```
+
+**Pre-filters (inline sub-selects):**
+- **rotables:** `tree_position LIKE '%APU%'` (or equivalent APU code) + `ac_registr IS NOT NULL` (installed only)
+- **aircraft:** `ac_typ = 'B737NG'`
+- **rotables_trend:** `trend_type = 'CT5ATP'` + window function `ROW_NUMBER() OVER (PARTITION BY psn ORDER BY ref_date DESC) = 1` to isolate latest per APU
+
+**Key columns to SELECT:**
+- `rotables.partno`, `rotables.serialno`, `rotables.ac_registr`
+- `rotables_trend.value` (CT5ATP), `rotables_trend.ref_date` (decoded: `DATE_ADD(DATE '1971-12-31', CAST(ref_date AS BIGINT))`)
+- `aircraft.ac_typ` (validation)
+
+**Join type rationale:**
+- INNER on aircraft: ensures only B737NG APUs
+- LEFT on trend: APU may exist with no trend history yet (don't drop)
+
+---
+
+## 3. RISKS
+
+| Risk | Mitigation |
+|---|---|
+| **Fan-out on trend join** | Pre-filter trend to `trend_type = 'CT5ATP'` + latest ref_date only (window function). Verify no multi-row trend per PSN. |
+| **NULL ac_registr** | Filter `ac_registr IS NOT NULL` in rotables; uninstalled APUs excluded by design. |
+| **AMOS date decoding** | Use `DATE_ADD(DATE '1971-12-31', CAST(ref_date AS BIGINT))` consistently; test with known dates. |
+| **APU tree_position code** | Confirm exact tree_position value for APU (e.g., `'APU'`, `'APU-MAIN'`). Coordinate with AMOS admin. |
+| **Reserved names** | Avoid `value`, `status`, `condition` as output aliases; rename to `ct5atp_value`, `rotable_status`, etc. |
+
+**Build recommendation:** Create as **Iceberg VDS** in `dremio-db.Engine` with CTAS refresh daily (trend data is historical, low churn).
+
+==============================================================
+  Proceed to Documentation + Dremio Agent? [y/n]: y
+
+==============================================================
+  DOCUMENTATION AGENT  �  Technical Implementation Document
+==============================================================
+  Generating Technical Implementation Document from ticket requirements ...
+  (This calls the configured LLM � may take 15�30 seconds)
+
+
+  Document saved: E:\LLM\Claude\adl_automated_delivery_pipeline\Project Documentation\ASL Technical Implementation - [APU Health Monitor] Create query for APU Health Monitor in Engine Folder.docx
+  Open it in Word for review and sign-off.
+
+  Proceed to Dremio Agent? [y/n]: y
+  Cooling down 5s to reset API rate limit window ... ready.
+
+
+==============================================================
+  DREMIO AGENT  --  Select Operation
+==============================================================
+  [1] Generate VDS query from ticket requirements  (recommended)
+  [2] Preview existing table or view
+  [3] Browse catalog folder / list views
+  [4] Execute a SQL query
+  [5] Validate SQL
+  [6] Create Virtual Dataset (provide SQL manually)
+  [7] Update existing VDS
+  [8] Free-text query (ask the Dremio Agent anything)
+  [0] Exit Dremio Agent
+==============================================================
+  Select option: 1
+
+  Generating SQL (attempt 1) ...
+  [auto-fix] Dremio SQL generation � applying fix and saving to memory ...
+  [memory] error + fix saved for future runs.
+
+==============================================================
+  GENERATED SQL  (attempt 1  |  ADL-1700)
+==============================================================
+
+-- VDS: APU Health Monitor
+-- Folder: Engine
+-- Purpose: Monitor APU health for B737NG aircraft by extracting APU performance data from AMOS
+-- Grain: One row per APU (rotable) per latest trend reference date
+-- Source: amos_postgres.amos.rotables, amos_postgres.amos.rotables_trend, amos_postgres.amos.aircraft
+-- Last Modified: ADL-1700
+
+WITH apu_trend_ranked AS (
+  SELECT
+    rt.psn,
+    rt.recno,
+    rt.ref_date,
+    rt.trend_type,
+    rt."value",
+    rt.event_perfno_i,
+    ROW_NUMBER() OVER (PARTITION BY rt.psn ORDER BY rt.ref_date DESC) AS rn
+  FROM amos_postgres.amos.rotables_trend rt
+  WHERE UPPER(rt.trend_type) = UPPER('CT5')
+)
+SELECT
+  r.partno,
+  r.serialno,
+  r.psn,
+  r.ac_registr,
+  DATE_ADD(DATE '1971-12-31', CAST(atr.ref_date AS BIGINT)) AS ref_date,
+  atr.trend_type,
+  COALESCE(atr.event_perfno_i, NULL) AS event_perfno_i,
+  atr."value" AS ct5atp_value,
+  a.ac_typ
+FROM amos_postgres.amos.rotables r
+INNER JOIN amos_postgres.amos.aircraft a
+  ON UPPER(r.ac_registr) = UPPER(a.ac_registr)
+LEFT JOIN apu_trend_ranked atr
+  ON r.psn = atr.psn
+  AND atr.rn = 1
+WHERE UPPER(a.ac_typ) = UPPER('B737NG')
+  AND r.ac_registr IS NOT NULL
+
+==============================================================
+  [1] Approve and save to file
+  [2] Regenerate with feedback
+  [3] Discard and return to menu
+==============================================================
+  Select [1/2/3]: 1
+
+  SQL saved: E:\LLM\Claude\adl_automated_delivery_pipeline\generated_queries\ADL-1700_20260623_061318.sql
+
+  Create VDS in Dremio now? [y/n]: y
+
+==============================================================
+  CREATE VDS  �  Step 1: Choose folder in dremio-db
+==============================================================
+  Fetching existing folders under dremio-db ... done  (24 folders found)
+
+  Existing folders under dremio-db:
+  [ 1]  dremio-db.Dev
+  [ 2]  dremio-db.Self_Service
+  [ 3]  dremio-db.amos_business_continuity
+  [ 4]  dremio-db.amos_training_status_report
+  [ 5]  dremio-db.apu_health
+  [ 6]  dremio-db.bi_server
+  [ 7]  dremio-db.cezanne_emp_directory
+  [ 8]  dremio-db.climate_transition_plan
+  [ 9]  dremio-db.daily_fleet_status
+  [10]  dremio-db.document_status_change
+  [11]  dremio-db.eagle_eye
+  [12]  dremio-db.engine_fleet_status
+  [13]  dremio-db.finance
+  [14]  dremio-db.fleet_mgmt
+  [15]  dremio-db.hoc
+  [16]  dremio-db.if_team
+  [17]  dremio-db.incomplete_material_picking
+  [18]  dremio-db.intercompany
+  [19]  dremio-db.inventory
+  [20]  dremio-db.maintenance_forecast_alert
+  [21]  dremio-db.maintenance_reliability_report
+  [22]  dremio-db.maintenance_reserve
+  [23]  dremio-db.occ
+  [24]  dremio-db.source
+  [ 0]  Create a new folder under dremio-db
+  [ C]  Cancel
+==============================================================
+  Select folder: 5
+
+==============================================================
+  CREATE VDS  �  Step 2: Inside dremio-db.apu_health
+==============================================================
+  You are now inside: dremio-db.apu_health
+    Sub-folder name (leave blank to use this folder directly): 
+
+==============================================================
+  CREATE VDS  �  Step 3: Name the VDS in dremio-db.apu_health
+==============================================================
+  Current location : dremio-db.apu_health
+  Suggested VDS name (from ticket/SQL): APU Health Monitor
+
+    VDS name [APU Health Monitor]: apu_health
+
+  VDS will be saved as:
+    dremio-db.apu_health.apu_health
+  
+  Confirm? [y/n]: y
+
+  A VDS named apu_health already exists at dremio-db.apu_health.apu_health.
+    Do you want to [b]ackup, [d]elete, or [c]ancel? [b/d/c]: d
+  Deleting existing VDS...
+  Old VDS deleted.
+
+  Creating VDS at dremio-db.apu_health.apu_health ...
+  SQL validated OK. Creating VDS ...
+  VDS created successfully!
+  ID  : {"tableKey":["dremio-db","apu_health","apu_health"],"contentId":"691c2112-9a1d-4218-9394-6a3e7df2d5da","versionContext":{"type":"BRANCH","value":"main"}}
+  Path: dremio-db.apu_health.apu_health
+
+
+  Updating dremio_vds_join_reference.md for dremio-db.apu_health.apu_health ...
+  dremio_vds_join_reference.md updated.
+  Build QlikSense dashboard from this VDS? [y/n]: y
+  Is there a separate JIRA ticket for Qlik? [y/n]: y
+
+  [1] Work on an existing Qlik ticket (browse sprint)
+  [2] Browse Qlik backlog tickets
+  [0] Cancel / use original ticket
+  Select option: 1
+
+  Loading sprints ... [checking 1 board(s)...] done
+
+==============================================================
+  SELECT SPRINT
+==============================================================
+  -- Active Sprint --
+  [ 1]  ADL Sprint 49  [ACTIVE]  <-- (Enter to select)
+
+  -- Recent Closed Sprints --
+  [ 2]  ADL Sprint 48  [CLOSED]
+  [ 3]  ADL Sprint 47  [CLOSED]
+  [ 4]  ADL Sprint 46  [CLOSED]
+  [ 5]  ADL Sprint 45  [CLOSED]
+  [ 6]  ADL Sprint 44  [CLOSED]
+  [ 7]  ADL Sprint 43  [CLOSED]
+  [ 8]  ADL Sprint 42  [CLOSED]
+  [ 9]  ADL Sprint 41  [CLOSED]
+  [10]  ADL Sprint 40  [CLOSED]
+  [11]  ADL Sprint 39  [CLOSED]
+  [ 0]  Back
+==============================================================
+  Select sprint number (Enter for active sprint): 1
+
+  Selected: ADL Sprint 49  [ACTIVE]
+
+==============================================================
+  ASSIGNEES  --  ADL Sprint 49
+==============================================================
+  [ 1]  Dhruv Mevada  (5 tickets)
+  [ 2]  Fenil Jain  (3 tickets)
+  [ 3]  Harini Reddy Godhala  (1 ticket)
+  [ 4]  Harsh Sanghvi  (9 tickets)
+  [ 5]  Isha Metange  (44 tickets)
+  [ 6]  Marmik Patel  (17 tickets)
+  [ 7]  Parthesh  (15 tickets)
+  [ 8]  Rashmi Pathak  (21 tickets)
+  [ 9]  Suhas Shete  (21 tickets)
+  [10]  Unassigned  (2 tickets)
+  [11]  Vansh Nautiyal  (2 tickets)
+  [12]  dhaval.dangi  (1 ticket)
+  [13]  kamal prakash  (1 ticket)
+  [ 0]  Back
+==============================================================
+  Select assignee number: 7
+
+==============================================================
+  TICKETS  --  Parthesh
+==============================================================
+   #  Key       Status           Pri Summary
+  --  --------- ---------------- --- ------------------------------------------------------------
+   1  ADL-1751  Done             Med [Daily Fleet Status] - Add email in distribution list
+   2  ADL-1747  To Do            Med [Finance Dashboard] POC for DIY for Details sheet
+   3  ADL-1744  To Do            Med [Qlik Access] - Need to provide access to below users
+   4  ADL-1727  To Do            Med [Finance Dashboard] Update Qlik dashboard to include all statutory codes in the Qlik Statutory Templ
+   5  ADL-1699  In Progress      Med [APU Health Monitor] Create APU Health Monitor dashboard in Engine Status Dashboard
+   6  ADL-1645  Ready for prod   Med [MM Discrepancy Report] UAT feedbacks
+   7  ADL-1618  Ready for prod   Med [Finance Dashboard - Prod Defect] - Cost center dimension is not appearing for views other than mont
+   8  ADL-1593  Ready for prod   Med [Finance P&L Document Currency] Currency INR and SAR are not displayed in Document Currency
+   9  ADL-1592  Ready for prod   Med [Finance P&L - Document Currency]  Header should get updated based on the toggle/button selected
+  10  ADL-1591  Ready for prod   Med [Finance Dashboard - Detailed Verison] Update existing P&L and BS Exchange Sheet with only one commo
+  11  ADL-1590  Ready for prod   Med [Finance - Masters]   Create Foreign Exchange Master Sheet in Finance Report - Detailed Version Dash
+  12  ADL-1586  Ready for prod   Med [Finance P&L - Document Currency]  Provide toggle for changing currency from Document Currency to Ne
+  13  ADL-1579  On hold          Med [Finance] - Qlik Showing Extra Decimal Digits Compared to Dremio
+  14  ADL-1540  On hold          Med [R&D] feasibility check for fetching active directory data into qlik app
+  15  ADL-1140  To Do            Med [Finance P&L] - Incorrect Data Display when selecting dimension filters
+   0   Back
+==============================================================
+  Select ticket number: 5
+
+  Fetching full Qlik ticket details ... done
+
+  Jira Agent analyzing ticket ... done
+
+==============================================================
+  TICKET REQUIREMENTS  (extracted by Jira Agent)
+==============================================================
+  Ticket  : ADL-1699
+  Summary : [APU Health Monitor] Create APU Health Monitor dashboard in Engine Status Dashboard
+
+  Business Requirement:
+    Create an APU Health Monitor sheet within the existing Engine Dashboard that displays APU maintenance and performance data with 8 key columns and conditional formatting applied to the CT5ATP value field to visually highlight risk levels based on threshold values.
+
+  Source Database : amos_postgres
+  Source Tables (5):
+    - amos.apu_health_monitor
+    - amos.apu_parts
+    - amos.apu_serial_numbers
+    - amos.aircraft_registration
+    - amos.workorders
+
+  Output Fields (8):
+    - APU P/n: APU Part Number identifier
+    - APU S/n: APU Serial Number identifier
+    - PSN: Part Serial Number
+    - Aircraft Registration: Aircraft registration code or tail number
+    - Reference Date: Date reference for the health monitoring record
+    - CT5: Trend Type classification (CT5)
+    - Workorder: Associated workorder number
+    - CT5ATP value: CT5 ATP numeric value used for conditional formatting and health assessment
+
+  Transformations (2):
+    - Convert Reference Date to DD-MM-YYYY format
+    - Apply conditional formatting to CT5ATP value column based on threshold rules
+
+  Filters (3):
+    - CT5ATP value less than 630 receives no formatting
+    - CT5ATP value equal to or greater than 630 and less than 660 receives Amber background color
+    - CT5ATP value equal to or greater than 660 receives Red background color
+
+  Acceptance Criteria (7):
+    - APU Health Monitor sheet is created and added to the existing Engine Dashboard
+    - All 8 columns are displayed with correct data from source tables
+    - CT5ATP values less than 630 display with no background formatting
+    - CT5ATP values between 630 and 659 display with Amber background color
+    - CT5ATP values 660 and above display with Red background color
+    - Data is sortable and searchable on all columns
+    - Sheet integrates seamlessly with existing Engine Fleet Status dashboard
+==============================================================
+
+==============================================================
+  QLIK AGENT  �  PRE-FLIGHT CHECK
+==============================================================
+  Fetching latest ticket data for ADL-1699 ... done
+
+  JIRA TICKET
+  Ticket ID     : ADL-1699
+  Summary       : [APU Health Monitor] Create APU Health Monitor dashboard in Engine Status Dashboard
+  Assignee      : Parthesh
+  Sprint        : ADL Sprint 49
+  Priority      : Medium
+  State         : In Progress
+
+  DREMIO VDS  (from Dremio Agent)
+  VDS Path      : dremio-db.apu_health.apu_health
+
+  OUTPUT FIELDS  (from Jira ticket � will become dashboard columns)
+    - APU P/n              APU Part Number identifier
+    - APU S/n              APU Serial Number identifier
+    - PSN                  Part Serial Number
+    - Aircraft Registration Aircraft registration code or tail number
+    - Reference Date       Date reference for the health monitoring record
+    - CT5                  Trend Type classification (CT5)
+    - Workorder            Associated workorder number
+    - CT5ATP value         CT5 ATP numeric value used for conditional formatting and health assessment
+
+  FILTERS  (from Jira ticket)
+    - CT5ATP value less than 630 receives no formatting
+    - CT5ATP value equal to or greater than 630 and less than 660 receives Amber background color
+    - CT5ATP value equal to or greater than 660 receives Red background color
+
+  ACCEPTANCE CRITERIA  (from Jira ticket)
+    - APU Health Monitor sheet is created and added to the existing Engine Dashboard
+    - All 8 columns are displayed with correct data from source tables
+    - CT5ATP values less than 630 display with no background formatting
+    - CT5ATP values between 630 and 659 display with Amber background color
+    - CT5ATP values 660 and above display with Red background color
+    - Data is sortable and searchable on all columns
+    - Sheet integrates seamlessly with existing Engine Fleet Status dashboard
+==============================================================
+    VDS path [dremio-db.apu_health.apu_health] (Enter to confirm or type override): 
+    App name [ADL-1699 - APU Health Monitor] (Enter to confirm): 
+    Qlik space [personal] (Enter to confirm): 
+
+  Ready to build dashboard:
+    Ticket : ADL-1699  (Parthesh  |  ADL Sprint 49)
+    VDS    : dremio-db.apu_health.apu_health
+    App    : ADL-1699 - APU Health Monitor
+    Space  : personal
+==============================================================
+2026-06-23 11:47:08,819  ERROR     adl_automated_delivery_pipeline.tools.qlik_tools - create_apu_health_dashboard failed
+Traceback (most recent call last):
+  File "E:\LLM\Claude\adl_automated_delivery_pipeline\src\adl_automated_delivery_pipeline\tools\qlik_tools.py", line 457, in create_apu_health_dashboard
+    rows = _fetch_dremio_rows(sql, max_rows=5000)
+  File "E:\LLM\Claude\adl_automated_delivery_pipeline\src\adl_automated_delivery_pipeline\tools\qlik_tools.py", line 105, in _fetch_dremio_rows
+    raise RuntimeError(f"Dremio job {state}: {info.get('errorMessage', '')}")
+RuntimeError: Dremio job FAILED: Column 'value' not found in any table
+    Proceed with Qlik dashboard creation? [y/n]: y
+
+  Connecting to Dremio and building dashboard ...
+    VDS   : dremio-db.apu_health.apu_health
+    App   : ADL-1699 - APU Health Monitor
+    Space : personal
+
+
+==============================================================
+  QLIK SENSE DASHBOARD READY
+==============================================================
+
+I encountered an error with the Dremio VDS. The column mapping appears to have an issue. Let me clarify a few things:
+
+**Issue:** The Dremio VDS at `dremio-db.apu_health.apu_health` is returning a schema error�specifically, a column named 'value' is not found.
+
+**Possible causes:**
+1. The VDS path may be incorrect or the table structure differs from expected
+2. The source columns in Dremio may have different names than anticipated
+3. The VDS may need to be refreshed or rebuilt in Dremio
+
+**Next steps:**
+Could you please verify:
+1. **Is the VDS path correct?** (`dremio-db.apu_health.apu_health`)
+2. **What are the actual column names** in the Dremio VDS? (e.g., is it `CT5ATP_value`, `ct5atp_value`, `value`, etc.?)
+3. **Can you confirm the VDS is accessible** and contains data?
+
+Once you provide the correct column names or VDS structure, I can adjust the dashboard creation accordingly.
+
+==============================================================
+
+  Validating local codebase against GitHub version ... done.
+  [Git] New changes detected (modified files or unpushed commits).
+    Would you like the GitHub Agent to commit and push these changes? [y/n]: y
+  Handing over to GitHub Agent...
+
+
+Perfect! ? I've successfully completed all the git operations:
+
+**Summary:**
+- **Status Check**: Found 6 modified files on the `feature/live-pipeline-dashboard` branch
+- **Files Staged**: All changes added to the staging area
+- **Commit**: Created commit `1cc43e8` with a comprehensive message summarizing:
+  - GitHub tools enhancements
+  - Workflow orchestration updates
+  - Dashboard improvements for live monitoring
+  - Documentation updates
+  - Agent outcomes and server logs
+- **Push**: Successfully pushed to `origin/feature/live-pipeline-dashboard`
+
+The ADL Pipeline repository is now up to date with all recent workflow and dashboard component changes!
+
+
+==============================================================
+  WORKFLOW COMPLETE
+==============================================================
+  Ticket  : ADL-1700
+==============================================================
+
+==============================================================
+  ASL AIRLINES  --  ADL WORKFLOW  |  JIRA -> DOC -> DREMIO -> QLIK
+==============================================================
+  [1]  Work on an existing ticket  (browse sprint)
+  [2]  Browse backlog tickets
+  [3]  Create a new ticket
+  [4]  GitHub version control assistant
+  [0]  Exit
+==============================================================
+  Select option: 1
+
+  Loading sprints ... [checking 1 board(s)...] done
+
+==============================================================
+  SELECT SPRINT
+==============================================================
+  -- Active Sprint --
+  [ 1]  ADL Sprint 49  [ACTIVE]  <-- (Enter to select)
+
+  -- Recent Closed Sprints --
+  [ 2]  ADL Sprint 48  [CLOSED]
+  [ 3]  ADL Sprint 47  [CLOSED]
+  [ 4]  ADL Sprint 46  [CLOSED]
+  [ 5]  ADL Sprint 45  [CLOSED]
+  [ 6]  ADL Sprint 44  [CLOSED]
+  [ 7]  ADL Sprint 43  [CLOSED]
+  [ 8]  ADL Sprint 42  [CLOSED]
+  [ 9]  ADL Sprint 41  [CLOSED]
+  [10]  ADL Sprint 40  [CLOSED]
+  [11]  ADL Sprint 39  [CLOSED]
+  [ 0]  Back
+==============================================================
+  Select sprint number (Enter for active sprint): 

@@ -28,8 +28,9 @@ def _reqs() -> TicketRequirements:
 @pytest.mark.unit
 def test_jira_to_context_maps_fields() -> None:
     ctx = jira_to_context(_reqs(), sql="SELECT 1", vds_path="dremio-db.occ.aslb_business")
-    assert ctx.title == "ADL-1729"
-    assert "Add carrier codes" in ctx.subtitle
+    # Title is the feature name (summary); ticket id lives in metadata only.
+    assert ctx.title == "Add carrier codes PH/QF"
+    assert ctx.subtitle == "Technical Implementation"
     assert ctx.metadata["ticket_id"] == "ADL-1729"
     assert ctx.data["source_tables"] == ["occ.aslb_business"]
     assert ctx.data["sql"] == "SELECT 1"

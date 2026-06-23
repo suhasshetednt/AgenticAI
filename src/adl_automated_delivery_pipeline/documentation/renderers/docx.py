@@ -91,7 +91,16 @@ def _parse_table(tokens: list[Token], start: int) -> tuple[list[str], list[list[
     return headers, rows, j + 1
 
 
-def _render_tokens(doc: Any, tokens: list[Token]) -> None:
+def _skip_title_block(tokens: list[Token]) -> list[Token]:
+    """Drop the leading H1 title / subtitle / prepared lines — the cover renders
+    those from context. Start rendering at the first '## ' section heading."""
+    for idx, t in enumerate(tokens):
+        if t.type == "heading_open" and t.tag == "h2":
+            return tokens[idx:]
+    return tokens
+
+
+def _render_tokens(doc: Any, tokens: list[Token], context: Any = None) -> None:
     i = 0
     n = len(tokens)
     while i < n:
@@ -99,7 +108,14 @@ def _render_tokens(doc: Any, tokens: list[Token]) -> None:
         ttype = tok.type
         try:
             if ttype == "heading_open":
-                brand.add_heading(doc, _inline_text(tokens[i + 1]), level=int(tok.tag[1]))
+                htext = _inline_text(tokens[i + 1])
+                # The doc's H1 is the cover title, so markdown '##' maps to Heading 1.
+                brand.add_heading(doc, htext, level=max(int(tok.tag[1]) - 1, 1))
+                low = htext.lower()
+                if context is not None and "logical diagram" in low:
+                    brand.add_logical_diagram(doc, context)
+                elif context is not None and "technical diagram" in low:
+                    brand.add_technical_diagram(doc, context)
                 i += 3
             elif ttype == "paragraph_open":
                 brand.add_paragraph(doc, _inline_text(tokens[i + 1]))
@@ -141,6 +157,31 @@ class DocxRenderer:
         doc, has_template = _open_branded_doc(template_name)
         if not has_template:
             brand.set_page_margins(doc)
-        _render_tokens(doc, _MD.parse(markdown))
+        brand.add_cover(doc, context)
+        _render_tokens(doc, _skip_title_block(_MD.parse(markdown)), context)
+        brand.set_footer(doc, str(context.get("title") or "").strip())
+        return _save_docx(doc, out_path)
+
+
+def _save_docx(doc: Any, out_path: Path) -> Path:
+    """Save, tolerating a target that's locked (e.g. open in Word).
+
+    On PermissionError, fall back to a timestamped sibling so a single open file
+    never loses the freshly generated document.
+    """
+    try:
         doc.save(str(out_path))
         return out_path
+    except PermissionError:
+        from datetime import datetime
+
+        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+        alt = out_path.with_name(f"{out_path.stem} ({ts}){out_path.suffix}")
+        doc.save(str(alt))
+        logger.warning(
+            "%s is locked (open in Word?); saved to %s instead. "
+            "Close the open copy to overwrite it next time.",
+            out_path.name,
+            alt.name,
+        )
+        return alt

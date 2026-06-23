@@ -62,7 +62,9 @@ class DocumentationAgent:
         context.metadata["_docx_template"] = str(template)
 
         prefix = _doc_prefix(str(template))
-        name = _safe_filename(context.subtitle or context.title)
+        # Name from the feature title (never the ticket id) -> "ASL Technical
+        # Implementation - <Feature Name>". Falls back to subtitle only if untitled.
+        name = _safe_filename(context.title or context.subtitle)
         stem = f"{prefix} - {name}" if name else prefix
 
         paths: list[Path] = []
