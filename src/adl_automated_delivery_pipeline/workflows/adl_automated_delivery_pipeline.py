@@ -2265,16 +2265,26 @@ def _post_workflow_git_check() -> None:
 
     # The git step is an optional convenience: skip cleanly when this directory
     # isn't a git repo or git isn't installed, rather than reporting a "failure".
+    # stdin=DEVNULL is critical: when the pipeline runs under the dashboard server
+    # (uvicorn, no real console), git inherits the server's stdin and any prompt
+    # (e.g. Git Credential Manager) blocks forever. DEVNULL makes such reads EOF.
+    # timeout guards against any other hang so a stuck git degrades to "skipped".
     try:
         inside = subprocess.run(
             ["git", "rev-parse", "--is-inside-work-tree"],
             capture_output=True,
             text=True,
             cwd=repo_root,
+            stdin=subprocess.DEVNULL,
+            timeout=15,
         )
     except FileNotFoundError:
         print(" skipped.")
         print("  [Git] git is not installed or not on PATH; skipping version check.\n")
+        return
+    except subprocess.TimeoutExpired:
+        print(" skipped.")
+        print("  [Git] git did not respond in time; skipping version check.\n")
         return
 
     if inside.returncode != 0 or inside.stdout.strip() != "true":
@@ -2284,11 +2294,13 @@ def _post_workflow_git_check() -> None:
 
     try:
         status_out = subprocess.check_output(
-            ["git", "status", "--porcelain"], text=True, cwd=repo_root
+            ["git", "status", "--porcelain"], text=True, cwd=repo_root,
+            stdin=subprocess.DEVNULL, timeout=15,
         ).strip()
         try:
             branch = subprocess.check_output(
-                ["git", "rev-parse", "--abbrev-ref", "HEAD"], text=True, cwd=repo_root, stderr=subprocess.DEVNULL
+                ["git", "rev-parse", "--abbrev-ref", "HEAD"], text=True, cwd=repo_root,
+                stderr=subprocess.DEVNULL, stdin=subprocess.DEVNULL, timeout=15,
             ).strip()
         except subprocess.CalledProcessError:
             branch = ""
@@ -2297,7 +2309,8 @@ def _post_workflow_git_check() -> None:
         if branch:
             try:
                 unpushed = subprocess.check_output(
-                    ["git", "log", f"origin/{branch}..{branch}", "--oneline"], text=True, cwd=repo_root
+                    ["git", "log", f"origin/{branch}..{branch}", "--oneline"], text=True, cwd=repo_root,
+                    stdin=subprocess.DEVNULL, timeout=15,
                 ).strip()
             except subprocess.CalledProcessError:
                 # No upstream tracking branch (e.g. origin/<branch> doesn't exist yet).
@@ -2316,6 +2329,9 @@ def _post_workflow_git_check() -> None:
             agent = GitHubAgent()
             res = agent.run("Please check git status, add all changed files, commit them with a descriptive message summarizing the recent pipeline workflow, and push to the remote repository.")
             print(f"\n{res.get('output', 'Done.')}\n")
+    except subprocess.TimeoutExpired:
+        print(" skipped.")
+        print("  [Git] git did not respond in time; skipping version check.\n")
     except (subprocess.CalledProcessError, OSError) as e:
         print(f" (Failed to check git status: {e})")
 

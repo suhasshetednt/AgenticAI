@@ -473,6 +473,7 @@ const App = () => {
     const nodesRef       = useRef(nodes);
     const activeAgentRef = useRef(null);  // tracks which agent phase is current
     const qlikJiraSubflowRef = useRef(false);  // true while Qlik has delegated to JIRA
+    const atMainMenuRef = useRef(false);  // true while the main menu is the active prompt
 
     useEffect(()=>{ nodesRef.current = nodes; }, [nodes]);
     // Track terminal container height so the active section always fills the viewport
@@ -511,6 +512,16 @@ const App = () => {
             if (data.type === 'log') {
                 addLine(data.message);
                 const m = data.message;
+                // MAIN MENU → idle slate. Clear active agent and reset every node to
+                // pending so a fresh run doesn't inherit the previous run's green/blink.
+                // The next menu selection (handled in handleSubmit) re-arms the agent.
+                if (m.includes('JIRA -> DOC -> DREMIO -> QLIK')) {
+                    atMainMenuRef.current = true;
+                    activeAgentRef.current = null;
+                    qlikJiraSubflowRef.current = false;
+                    stopPlane();
+                    setNodes(NODES_INIT);
+                }
                 // JIRA
                 if (m.includes('Jira Agent analyzing ticket')) {
                     activeAgentRef.current = 'jira';
@@ -603,6 +614,17 @@ const App = () => {
         if (!prompt) return;
         const echo = '  → ' + inputVal;
         ws.current.send(inputVal);
+        // Answering the main menu: arm the agent this choice maps to so its aura
+        // blinks for the entire phase (the 'prompt' handler re-asserts it each prompt,
+        // covering the sprint/assignee/ticket browse steps before the JIRA log fires).
+        if (atMainMenuRef.current) {
+            const sel = inputVal.trim();
+            atMainMenuRef.current = false;
+            const aid = (sel === '1' || sel === '2' || sel === '3') ? 'jira'
+                      : (sel === '4') ? 'git' : null;
+            activeAgentRef.current = aid;
+            if (aid) setNodes(ns => ns.map(n => n.id === aid ? {...n, status:'blinking'} : n));
+        }
         setInputVal(''); setPrompt(null); setWsState('processing');
         // Active agent keeps blinking until a log message marks it completed.
         // Flush active session (+ echo of answer) into history; start fresh

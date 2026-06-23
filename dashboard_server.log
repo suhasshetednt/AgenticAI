@@ -1,5 +1,107 @@
-INFO:     Started server process [25784]
+INFO:     Started server process [33388]
 INFO:     Waiting for application startup.
 INFO:     Application startup complete.
 INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
-INFO:     127.0.0.1:59584 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57737 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59606 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59639 - "WebSocket /ws" [accepted]
+INFO:     connection open
+
+==============================================================
+  SELECT PROJECT
+==============================================================
+  Loading projects ...
+  [1] ADL        ASL Data Lake   (default)
+  [2] ASL        ASL Integration Framework
+  [3] PSUD       Process Set up Dummy 
+  [0] Cancel
+==============================================================
+  Select project number (Enter for ADL): 1
+
+  Project set to ADL  (board id 2).
+
+==============================================================
+  ASL AIRLINES  --  ADL WORKFLOW  |  JIRA -> DOC -> DREMIO -> QLIK
+==============================================================
+  [1]  Work on an existing ticket  (browse sprint)
+  [2]  Browse backlog tickets
+  [3]  Create a new ticket
+  [4]  GitHub version control assistant
+  [0]  Exit
+==============================================================
+  Select option: 1
+
+  Loading sprints ... [checking 1 board(s)...] done
+
+==============================================================
+  SELECT SPRINT
+==============================================================
+  -- Active Sprint --
+  [ 1]  ADL Sprint 49  [ACTIVE]  <-- (Enter to select)
+
+  -- Recent Closed Sprints --
+  [ 2]  ADL Sprint 48  [CLOSED]
+  [ 3]  ADL Sprint 47  [CLOSED]
+  [ 4]  ADL Sprint 46  [CLOSED]
+  [ 5]  ADL Sprint 45  [CLOSED]
+  [ 6]  ADL Sprint 44  [CLOSED]
+  [ 7]  ADL Sprint 43  [CLOSED]
+  [ 8]  ADL Sprint 42  [CLOSED]
+  [ 9]  ADL Sprint 41  [CLOSED]
+  [10]  ADL Sprint 40  [CLOSED]
+  [11]  ADL Sprint 39  [CLOSED]
+  [ 0]  Back
+==============================================================
+  Select sprint number (Enter for active sprint): 1
+
+  Selected: ADL Sprint 49  [ACTIVE]
+
+  Fetching tickets for ADL Sprint 49 ... done  (142 tickets found)
+
+==============================================================
+  ASSIGNEES  --  ADL Sprint 49
+==============================================================
+  [ 1]  Dhruv Mevada  (5 tickets)
+  [ 2]  Fenil Jain  (3 tickets)
+  [ 3]  Harini Reddy Godhala  (1 ticket)
+  [ 4]  Harsh Sanghvi  (11 tickets)
+  [ 5]  Isha Metange  (44 tickets)
+  [ 6]  Marmik Patel  (17 tickets)
+  [ 7]  Parthesh  (15 tickets)
+  [ 8]  Rashmi Pathak  (21 tickets)
+  [ 9]  Suhas Shete  (20 tickets)
+  [10]  Unassigned  (2 tickets)
+  [11]  Vansh Nautiyal  (1 ticket)
+  [12]  dhaval.dangi  (1 ticket)
+  [13]  kamal prakash  (1 ticket)
+  [ 0]  Back
+==============================================================
+  Select assignee number: 9
+
+==============================================================
+  TICKETS  --  Suhas Shete
+==============================================================
+   #  Key       Status           Pri Summary
+  --  --------- ---------------- --- ------------------------------------------------------------
+   1  ADL-1757  Ready for review Med Update VDS Paths in OCC Technical Delay Dataset
+   2  ADL-1752  Ready for review Med Optimize Finance VDS
+   3  ADL-1748  Ready for review Med Daily Fleet Status & Amos Business Continuity Query Performance Issue � Query Timeout Due to Engine 
+   4  ADL-1740  Done             Med [ Finance ] - Upload Master sheet in S3
+   5  ADL-1733  Ready for review Med [ Movement Manager ] - AOG query optimisation
+   6  ADL-1724  To Do            Med [Incomplete Material Picking]  Add more fields to the incomplete material picking vds
+   7  ADL-1721  Ready for review Med Create Production Document for Training Status Report
+   8  ADL-1718  To Do            Med [Movement Manager] Python script has been failing at multiple intervals
+   9  ADL-1716  Done             Med [ Finance ] - Move all the Tally VDS from Dev folder to finance folder
+  10  ADL-1703  Ready for review Med SAP Data Catalog
+  11  ADL-1701  In Progress      Med [APU Health Monitor] Create Document technical solution
+  12  ADL-1700  In Progress      Med [APU Health Monitor] Create query for APU Health Monitor in Engine Folder
+  13  ADL-1662  Done             Med Create AOG and AOG updates VDS under fleet_mgmt foder in Dremio
+  14  ADL-1656  On hold          Med [MM Discrepancy Report] Payload Missing 
+  15  ADL-1589  Ready for prod   Med [Finance - Masters]   Create Foreign Exchange Master VDS using TCURR table as source from SAP
+  16  ADL-1588  Ready for prod   Med [Finance Dashboard - Prod Issue]  FX calculation logic for P&L was taking -2 months closing balance 
+  17  ADL-1585  Ready for prod   Med [Finance] - Opening and Closing Balance Mismatch for Balance Sheet
+  18  ADL-1576  Ready for prod   Med [Finance P&L- Document Currency] Document currency value for Australian and New Zealand entity is in
+  19  ADL-1525  On hold          Med [AMOS Upgrade] All dashboards should be running as it is post to AMOS Upgrade.
+  20  ADL-902   On hold          Med [Eagle Eye] Reflection for technical delay is working sometime and sometimes doesn't
+   0   Back
+==============================================================
