@@ -246,6 +246,54 @@ GROUP BY rt."value"
 - **NEVER** use correlated subqueries for finding the "latest" or "max" record (e.g., `WHERE date = (SELECT MAX(date) FROM table WHERE id = outer.id)`). Dremio performs poorly with these.
 - **ALWAYS** use `ROW_NUMBER() OVER (PARTITION BY ... ORDER BY ... DESC)` inside a CTE, and then filter `WHERE row_num = 1` in the main query to get the latest record. Or use a standard `GROUP BY` CTE and join it back.
 
+### 3.3a "Latest-per-key" — ONE canonical pattern only (CORRECTNESS, not just performance)
+Selecting the latest/most-recent row per key (latest trend per PSN, latest event per
+aircraft, etc.) is the single most common cause of a query that **validates fine but
+returns 0 rows** in Dremio. There is exactly **one** approved pattern. Use it verbatim.
+
+**APPROVED — CTE + `ROW_NUMBER()`, ranking filter applied to the CTE result:**
+```sql
+WITH latest_trends AS (
+  SELECT rt.psn, rt.ref_date, rt.trend_type, rt."value", rt.event_perfno_i,
+         ROW_NUMBER() OVER (PARTITION BY rt.psn ORDER BY rt.ref_date DESC) AS rn
+  FROM amos_postgres.amos.rotables_trend rt
+  WHERE UPPER(rt.trend_type) = UPPER('CT5')   -- filter the trend type INSIDE the CTE, before ranking
+)
+SELECT r.partno, r.serialno, r.psn, r.ac_registr,
+       DATE_ADD(DATE '1971-12-31', CAST(lt.ref_date AS BIGINT)) AS ref_date,
+       lt.trend_type, lt.event_perfno_i, lt."value", a.ac_typ
+FROM amos_postgres.amos.rotables r
+INNER JOIN latest_trends lt ON r.psn = lt.psn AND lt.rn = 1   -- pick the latest in the JOIN
+INNER JOIN amos_postgres.amos.aircraft a ON UPPER(r.ac_registr) = UPPER(a.ac_registr)
+WHERE UPPER(a.ac_typ) = UPPER('B737NG')
+```
+
+**BANNED — these return 0 rows or wrong rows even though they pass validation:**
+
+1. A correlated scalar subquery used as a "latest" existence guard. The inner window's
+   `ORDER BY` references the OUTER alias, so Dremio evaluates the subquery to NULL for
+   every row and `IS NOT NULL` filters the entire result to **0 rows**:
+   ```sql
+   -- ❌ NEVER do this — produced 0 rows on apu_health / ADL-1700
+   AND (SELECT 1 FROM (
+          SELECT ROW_NUMBER() OVER (PARTITION BY r.psn ORDER BY rt.ref_date DESC) AS rn
+          FROM amos_postgres.amos.rotables_trend rt_inner
+          WHERE rt_inner.psn = r.psn AND UPPER(rt_inner.trend_type) = UPPER('CT5')
+        ) ranked WHERE ranked.rn = 1) IS NOT NULL
+   ```
+2. Ranking with `ROW_NUMBER()` over **all** trend types and then filtering
+   `trend_type = '...'` in the OUTER `WHERE` alongside `rn = 1`. The latest row per key
+   may not be the wanted type, so `rn = 1` and the type filter disagree and rows vanish.
+   The type filter MUST live inside the ranking CTE (as shown in the approved pattern).
+3. Inventing columns that do not exist as ranking/filter predicates (e.g. `trend_status`,
+   `is_latest`). `rotables_trend` has **no** `trend_status` column — adding it fails
+   validation. Confirm every predicate column with `search_catalog()` first.
+
+> A single, plain `QUALIFY ROW_NUMBER() OVER (PARTITION BY ... ORDER BY ... DESC) = 1` is
+> acceptable to Dremio, but do **not** combine it with a correlated subquery guard or any
+> redundant "latest" filter. When unsure, fall back to the approved CTE pattern above — it
+> is the only form that is verified to return the correct rows.
+
 ### 3.4 LIMIT
 - Always add `LIMIT 100` (or less) in ad-hoc exploration queries.
 - Never add LIMIT to VDS definitions — let the consumer control row count.
@@ -355,4 +403,6 @@ manually verify every `alias.column` reference against `catalog_data.json`.
 - [ ] AMOS source consistency: if any table is from amos_postgres, ALL tables are from amos_postgres (never mix with mm.table, SAP, Xero etc.)
 - [ ] AMOS aircraft joined on `ac_registr` (not `tail_number` — that belongs to the MM aircraft table)
 - [ ] `rotables` table columns use `partno` and `serialno` (not standard abbreviations like `pn`, `sn`, `part_no`, or `serial_no`)
+- [ ] "Latest-per-key" uses the §3.3a CTE + `ROW_NUMBER()` pattern ONLY — no correlated scalar-subquery "latest" guard, no QUALIFY-plus-subquery combo, and the type/category filter sits INSIDE the ranking CTE (a query that validates but returns 0 rows is almost always this bug)
+- [ ] Every WHERE/ranking predicate column exists in the catalog (e.g. `rotables_trend` has no `trend_status`) — verified via `search_catalog()`
 
