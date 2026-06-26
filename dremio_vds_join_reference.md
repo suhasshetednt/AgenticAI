@@ -533,3 +533,18 @@ Domain: Head-of-Contract lease management. One enrichment VDS + two CSV passthro
   - rotables (r)  LEFT JOIN  rotables_trend (rt)  ON r.psn = rt.psn AND rt.trend_type = 'CT5'
 - **Filters / logic:** Aircraft type filtered to B737NG (case-insensitive); trend type restricted to CT5; ROW_NUMBER() ranks trends by ref_date descending per PSN, selecting only most recent (rn = 1).
 - **Build notes:** ref_date is converted from integer offset days since 1971-12-31; duplicate trend_type filter in WHERE clause is redundant with JOIN condition; LEFT JOINs may produce nulls if aircraft or trend records missing.
+
+
+---
+
+### Created via workflow — 2026-06-26 09:26 UTC  (ADL-1700)
+
+#### `dremio-db.apu_health.apu_health`  ✅
+- **Purpose:** Monitor APU health for B737NG aircraft by extracting the latest CT5 ATP trend values for performance tracking.
+- **Grain:** One row per APU (unique PSN) with its most recent CT5 ATP performance metric.
+- **Source tables:** amos_postgres.amos.rotables, amos_postgres.amos.rotables_trend, amos_postgres.amos.aircraft
+- **Join map:**
+  - rotables r  INNER JOIN  rotables_trend rt  ON r.psn = rt.psn
+  - rotables_with_rn rwr  INNER JOIN  aircraft a  ON UPPER(rwr.ac_registr) = UPPER(a.ac_registr)
+- **Filters / logic:** Excludes null aircraft registrations; filters to CT5 trend type only; selects most recent trend per PSN using ROW_NUMBER(); limits to B737NG aircraft type; ref_date converted from AMOS epoch (1971-12-31).
+- **Build notes:** ROW_NUMBER() window function requires ordered ref_date DESC to capture latest trend; case-insensitive aircraft registration matching; ref_date conversion uses AMOS epoch baseline; PSN is the unique rotable identifier.
