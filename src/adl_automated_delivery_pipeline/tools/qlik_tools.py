@@ -246,9 +246,9 @@ def _publish_app_to_space(app_id: str, space_id: str, app_name: str) -> str:
 
 
 def _move_app_to_shared_space(app_id: str, space_id: str) -> None:
-    items = _rest_get(f"/items?resourceType=app&resourceId={app_id}&limit=5").get("data", [])
-    if items:
-        _rest_patch(f"/items/{items[0]['id']}", {"spaceId": space_id})
+    # PATCH /items/{id} returns 405 on current Qlik Cloud — /apps/{id}/space is the
+    # supported way to reassign an app's space.
+    _rest("PUT", f"/apps/{app_id}/space", json={"spaceId": space_id})
 
 
 # ── REST reload (async + poll) ────────────────────────────────────────────────
