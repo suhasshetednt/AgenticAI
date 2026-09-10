@@ -654,3 +654,18 @@ Domain: Head-of-Contract lease management. One enrichment VDS + two CSV passthro
   - rotables r  LEFT JOIN  aircraft a  ON UPPER(r.ac_registr) = UPPER(a.ac_registr)
 - **Filters / logic:** Trend type = 'CT5'; Aircraft type = 'B737NG'; ROW_NUMBER window partitioned by PSN ordered by ref_date DESC, selecting only rn = 1 (latest record per APU).
 - **Build notes:** ref_date is converted from epoch integer (base date 1971-12-31) using DATE_ADD; all string columns normalized to uppercase; case-insensitive joins on aircraft registration; future modifications should preserve the window function logic to maintain "latest only" grain.
+
+
+---
+
+### Created via workflow — 2026-09-10 07:49 UTC  (ADL-1700)
+
+#### `dremio-db.apu_health.apu_health`  ✅
+- **Purpose:** Monitor APU health for ASL B737NG aircraft by retrieving the latest CT5 ATP trend data per APU.
+- **Grain:** One row per APU (PSN) with the most recent reference date.
+- **Source tables:** amos_postgres.amos.rotables_trend, amos_postgres.amos.rotables, amos_postgres.amos.aircraft
+- **Join map:**
+  - rotables_trend rt  INNER JOIN  rotables r  ON rt.psn = r.psn
+  - rotables r  LEFT JOIN  aircraft ac  ON UPPER(r.ac_registr) = UPPER(ac.ac_registr)
+- **Filters / logic:** Trend type = 'CT5'; aircraft type = 'B737NG'; ROW_NUMBER window partitioned by PSN ordered by ref_date DESC, selecting only rn = 1 (latest trend per APU).
+- **Build notes:** Reference date is calculated from epoch offset (1971-12-31 base). Case-insensitive matching applied to trend_type, ac_typ, and ac_registr. Aircraft join is LEFT to preserve rotables records without aircraft master data.
